@@ -1,58 +1,163 @@
 const { generateReply } = require("../services/geminiService");
-const { getEmotion, setEmotion } = require("../memory/emotionStore");
+
+const { getMemory, updateMemory, clearMemory } = require("../memory/memoryStore");
+const { extractMemory } = require("../services/memoryService");
+
+const {
+    getPersonality,
+    updatePersonality,
+    clearPersonality,
+} = require("../memory/personalityStore");
+const {
+    detectPersonalityChange,
+} = require("../services/personalityService");
+
+const { getEmotion, setEmotion, clearEmotion } = require("../memory/emotionStore");
 const { detectEmotion } = require("../services/emotionService");
-const { addEmotion, getHistory } = require("../memory/emotionHistoryStore");
-const { analyzeEmotionPattern } = require("../services/emotionAnalyzer");
+
+const {
+    addEmotion,
+    getHistory,
+    clearHistory,
+} = require("../memory/emotionHistoryStore");
+const {
+    analyzeEmotionPattern,
+} = require("../services/emotionAnalyzer");
+
+function normalizeMessagePayload(data) {
+    const message = data?.message ?? data?.text;
+
+    if (typeof message !== "string") {
+        return null;
+    }
+
+    const trimmed = message.trim();
+    return trimmed ? trimmed : null;
+}
+
+function applyMemory(socketId, memoryData) {
+    if (!memoryData) return;
+
+    const update = {
+        fact: {
+            type: memoryData.type,
+            value: memoryData.value,
+        },
+    };
+
+    if (memoryData.type === "name") update.name = memoryData.value;
+    if (memoryData.type === "nickname") update.nickname = memoryData.value;
+    if (memoryData.type === "language") update.language = memoryData.value;
+    if (memoryData.type === "like") update.like = memoryData.value;
+
+    updateMemory(socketId, update);
+}
+
+function emitTyping(socket, status) {
+    socket.emit("yuna_typing", { status });
+    socket.emit("yuna:typing", { status });
+}
+
+function emitReply(socket, payload) {
+    socket.emit("yuna_reply", payload);
+    socket.emit("yuna:message:reply", {
+        id: `${Date.now()}-${socket.id}`,
+        role: "assistant",
+        text: payload.message,
+        createdAt: new Date().toISOString(),
+        emotion: payload.emotion,
+        intensity: payload.intensity,
+        voice: payload.voice,
+    });
+}
+
+function emitError(socket, message) {
+    socket.emit("yuna_error", {
+        message,
+        emotion: "neutral",
+        intensity: 50,
+    });
+    socket.emit("yuna:message:error", {
+        message,
+        createdAt: new Date().toISOString(),
+    });
+}
 
 function socketHandler(io) {
     io.on("connection", (socket) => {
-        console.log("🟢 User connected:", socket.id);
+        console.log("User connected:", socket.id);
+        socket.emit("yuna:connection:ready", { socketId: socket.id });
 
-        socket.on("user_message", async (data) => {
+        const handleUserMessage = async (data) => {
             try {
-                const userMessage = data.message;
-                if (!userMessage) return;
+                const userMessage = normalizeMessagePayload(data);
 
-                // 🎭 STEP 1: Detect emotion
-                const detected = detectEmotion(userMessage);
+                if (!userMessage) {
+                    socket.emit("yuna_error", {
+                        message: "Please send a non-empty message.",
+                    });
+                    return;
+                }
 
-                // 🔄 STEP 2: Update emotion state
-                setEmotion(socket.id, detected);
+                console.log("User:", userMessage);
 
+                emitTyping(socket, true);
+
+                const memoryData = extractMemory(userMessage);
+                applyMemory(socket.id, memoryData);
+                const memory = getMemory(socket.id);
+
+                const personalityChange = detectPersonalityChange(userMessage);
+                if (personalityChange) {
+                    updatePersonality(socket.id, personalityChange);
+                }
+                const personality = getPersonality(socket.id);
+
+                const detectedEmotion = detectEmotion(userMessage);
+                setEmotion(socket.id, detectedEmotion);
                 const emotion = getEmotion(socket.id);
 
-                // 💜 Typing start
-                socket.emit("yuna_typing", { status: true });
+                addEmotion(socket.id, emotion);
+                const history = getHistory(socket.id);
+                const pattern = analyzeEmotionPattern(history);
+
                 const reply = await generateReply(userMessage, {
+                    memory,
+                    personality,
                     emotion,
-                    pattern, // 👈 NEW
+                    pattern,
                 });
 
-                // 🤖 STEP 3: Send to Gemini with emotion context
-                const reply = await generateReply(userMessage, {
-                    emotion,
-                });
+                emitTyping(socket, false);
 
-                // 💜 Typing stop
-                socket.emit("yuna_typing", { status: false });
-
-                // 📡 Send reply + emotion
-                socket.emit("yuna_reply", {
+                emitReply(socket, {
                     message: reply,
                     emotion: emotion.mood,
                     intensity: emotion.intensity,
+                    confidence: emotion.confidence,
+                    personality,
+                    memory,
+                    pattern,
+                    voice: { enabled: true },
                 });
 
             } catch (error) {
-                console.error(error);
+                console.error("Socket Error:", error);
 
-                socket.emit("yuna_typing", { status: false });
-
-                socket.emit("yuna_reply", {
-                    message: "Emotion system error 💔",
-                    emotion: "neutral",
-                });
+                emitTyping(socket, false);
+                emitError(socket, "Sorry... something went wrong. I couldn't reply properly.");
             }
+        };
+
+        socket.on("user_message", handleUserMessage);
+        socket.on("yuna:message:send", handleUserMessage);
+
+        socket.on("disconnect", () => {
+            clearMemory(socket.id);
+            clearPersonality(socket.id);
+            clearEmotion(socket.id);
+            clearHistory(socket.id);
+            console.log("User disconnected:", socket.id);
         });
     });
 }

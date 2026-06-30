@@ -1,57 +1,70 @@
+const POSITIVE_MOODS = new Set(["happy", "excited"]);
+const NEGATIVE_MOODS = new Set([
+    "sad",
+    "depressed",
+    "stressed",
+    "anxious",
+    "lonely",
+    "scared",
+    "angry",
+    "frustrated",
+    "tired",
+]);
+
+function moodScore(entry) {
+    const intensity = Number(entry?.intensity) || 50;
+
+    if (POSITIVE_MOODS.has(entry?.mood)) return intensity;
+    if (NEGATIVE_MOODS.has(entry?.mood)) return -intensity;
+    return 0;
+}
+
 function analyzeEmotionPattern(history = []) {
-    if (!history.length) {
+    if (!Array.isArray(history) || !history.length) {
         return {
+            dominantMood: "neutral",
             dominant: "neutral",
             trend: "stable",
+            recentEmotion: { mood: "neutral", intensity: 50, confidence: 0.45 },
+            averageIntensity: 50,
         };
     }
 
-    let happy = 0;
-    let sad = 0;
-    let angry = 0;
-    let excited = 0;
-
-    history.forEach((h) => {
-        switch (h.mood) {
-            case "happy":
-                happy++;
-                break;
-            case "sad":
-                sad++;
-                break;
-            case "angry":
-                angry++;
-                break;
-            case "excited":
-                excited++;
-                break;
+    const counts = history.reduce((acc, entry) => {
+        if (entry?.mood) {
+            acc[entry.mood] = (acc[entry.mood] || 0) + 1;
         }
-    });
 
-    const max = Math.max(happy, sad, angry, excited);
+        return acc;
+    }, {});
 
-    let dominant = "neutral";
+    const dominantMood = Object.entries(counts).sort((a, b) => b[1] - a[1])[0]?.[0] || "neutral";
+    const recentEmotion = history[history.length - 1];
+    const averageIntensity = Math.round(
+        history.reduce((sum, entry) => sum + (Number(entry?.intensity) || 0), 0) / history.length
+    );
 
-    if (max === happy) dominant = "happy";
-    if (max === sad) dominant = "sad";
-    if (max === angry) dominant = "angry";
-    if (max === excited) dominant = "excited";
-
-    // trend detection
-    const last = history.slice(-5);
+    const recent = history.slice(-5);
+    const firstHalf = recent.slice(0, Math.ceil(recent.length / 2));
+    const secondHalf = recent.slice(Math.floor(recent.length / 2));
+    const firstScore = firstHalf.reduce((sum, entry) => sum + moodScore(entry), 0) / firstHalf.length;
+    const secondScore = secondHalf.reduce((sum, entry) => sum + moodScore(entry), 0) / secondHalf.length;
 
     let trend = "stable";
-    if (last.length >= 3) {
-        const recentSad = last.filter(h => h.mood === "sad").length;
-        const recentHappy = last.filter(h => h.mood === "happy").length;
+    if (recent.length >= 3 && secondScore - firstScore > 20) {
+        trend = "improving";
+    }
 
-        if (recentSad > recentHappy + 1) trend = "declining";
-        if (recentHappy > recentSad + 1) trend = "improving";
+    if (recent.length >= 3 && firstScore - secondScore > 20) {
+        trend = "declining";
     }
 
     return {
-        dominant,
+        dominantMood,
+        dominant: dominantMood,
         trend,
+        recentEmotion,
+        averageIntensity,
     };
 }
 

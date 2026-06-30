@@ -11,5 +11,5 @@ export function useLive2D(controller) {
         controller.setEmotion(emotion);
         controller.setIntensity(intensity);
 
-    }, [emotion, intensity]);
+    }, [controller, emotion, intensity]);
 }

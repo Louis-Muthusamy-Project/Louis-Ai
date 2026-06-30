@@ -5,11 +5,11 @@
   "description": "Yuna - real-time anime-inspired AI companion (desktop)",
   "main": "electron/main.js",
   "scripts": {
-    "client:start": "cd client && npm start",
+    "client:start": "cd yuna && npm run dev",
     "server:start": "cd server && npm run dev",
-    "electron:dev": "cd electron && npm run dev",
-    "dev": "npm run server:start & npm run client:start & npm run electron:dev",
-    "build": "cd client && npm run build"
+    "electron:dev": "cd electron && npm start",
+    "dev": "concurrently \"npm run server:start\" \"npm run client:start\" \"npm run electron:dev\"",
+    "build": "cd yuna && npm run build"
   },
   "dependencies": {
     "concurrently": "^9.0.0"

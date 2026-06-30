@@ -2,15 +2,23 @@ export class LipSyncController {
     constructor(model) {
         this.model = model;
         this.isSpeaking = false;
+        this.animationFrameId = null;
     }
 
     start() {
+        if (this.isSpeaking) return;
+
         this.isSpeaking = true;
         this.animate();
     }
 
     stop() {
         this.isSpeaking = false;
+
+        if (this.animationFrameId) {
+            cancelAnimationFrame(this.animationFrameId);
+            this.animationFrameId = null;
+        }
 
         if (this.model) {
             this.model.mouthOpen = 0;
@@ -26,6 +34,6 @@ export class LipSyncController {
             this.model.mouthOpen = value;
         }
 
-        requestAnimationFrame(() => this.animate());
+        this.animationFrameId = requestAnimationFrame(() => this.animate());
     }
 }

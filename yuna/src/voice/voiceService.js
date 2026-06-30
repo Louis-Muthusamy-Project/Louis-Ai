@@ -1,8 +1,22 @@
-export function speakText(text) {
-    if (!("speechSynthesis" in window)) {
-        console.warn("Speech not supported");
-        return;
+let voicesLoaded = false;
+
+function getVoices() {
+    const voices = window.speechSynthesis.getVoices();
+
+    if (voices.length) {
+        voicesLoaded = true;
     }
+
+    return voices;
+}
+
+export function speakText(text) {
+    if (!text || typeof window === "undefined" || !("speechSynthesis" in window)) {
+        console.warn("Speech not supported");
+        return null;
+    }
+
+    window.speechSynthesis.cancel();
 
     const utterance = new SpeechSynthesisUtterance(text);
 
@@ -10,15 +24,26 @@ export function speakText(text) {
     utterance.pitch = 1.2; // anime-like voice feel
     utterance.volume = 1;
 
-    // Optional: choose voice
-    const voices = speechSynthesis.getVoices();
-    const femaleVoice = voices.find(v => v.name.includes("female"));
+    const voices = getVoices();
+    const preferredVoice = voices.find((voice) =>
+        /female|zira|samantha|aria|natural/i.test(voice.name)
+    );
 
-    if (femaleVoice) {
-        utterance.voice = femaleVoice;
+    if (preferredVoice) {
+        utterance.voice = preferredVoice;
     }
 
-    speechSynthesis.speak(utterance);
+    const speak = () => window.speechSynthesis.speak(utterance);
+
+    if (!voicesLoaded && "onvoiceschanged" in window.speechSynthesis) {
+        window.speechSynthesis.onvoiceschanged = () => {
+            voicesLoaded = true;
+            speak();
+            window.speechSynthesis.onvoiceschanged = null;
+        };
+    } else {
+        speak();
+    }
 
     return utterance;
 }

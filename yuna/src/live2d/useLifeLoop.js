@@ -5,6 +5,7 @@ export function useLifeLoop(controller) {
         if (!controller) return;
 
         let lastTime = performance.now();
+        let animationFrameId = null;
 
         const loop = (time) => {
             const delta = time - lastTime;
@@ -12,9 +13,15 @@ export function useLifeLoop(controller) {
 
             controller.update(delta);
 
-            requestAnimationFrame(loop);
+            animationFrameId = requestAnimationFrame(loop);
         };
 
-        requestAnimationFrame(loop);
+        animationFrameId = requestAnimationFrame(loop);
+
+        return () => {
+            if (animationFrameId) {
+                cancelAnimationFrame(animationFrameId);
+            }
+        };
     }, [controller]);
 }

@@ -2,20 +2,21 @@ import { useState } from "react";
 import { useChat } from "../hooks/useChat";
 import { useEmotionStore } from "../store/emotionStore";
 
-
-const emotion = useEmotionStore((s) => s.emotion);
 export default function Chat() {
-    const { messages, sendMessage, isTyping } = useChat();
+    const { messages, sendMessage, isTyping, connectionStatus } = useChat();
+    const emotion = useEmotionStore((s) => s.emotion);
     const [input, setInput] = useState("");
 
     const handleSend = () => {
-        sendMessage(input);
-        setInput("");
+        if (sendMessage(input)) {
+            setInput("");
+        }
     };
 
     return (
         <div style={{ padding: "20px" }}>
             <h2>Yuna Chat 💜</h2>
+            <div>Status: {connectionStatus}</div>
 
             <div
                 style={{

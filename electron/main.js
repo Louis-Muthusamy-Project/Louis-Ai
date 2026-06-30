@@ -1,7 +1,7 @@
 const path = require('path');
 const { app, BrowserWindow } = require('electron');
 
-// Milestone 1: open CRA dev server in development.
+// Milestone 1: open Vite dev server in development.
 // In production, we will point to the built client directory.
 const isDev = process.env.ELECTRON_DEV !== 'false';
 
@@ -20,10 +20,9 @@ function createWindow() {
   });
 
   if (isDev) {
-    // CRA default dev server port
-    win.loadURL('http://localhost:3000');
+    win.loadURL(process.env.VITE_DEV_SERVER_URL || 'http://localhost:5173');
   } else {
-    const clientBuild = path.join(__dirname, '..', 'client', 'build');
+    const clientBuild = path.join(__dirname, '..', 'yuna', 'dist');
     win.loadFile(path.join(clientBuild, 'index.html'));
   }
 

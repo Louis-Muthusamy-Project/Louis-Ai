@@ -28,6 +28,7 @@ export default function Live2DScene() {
 
         return () => {
             window.removeEventListener("yuna_speaking", handleSpeak);
+            lipSyncRef.current?.stop();
         };
 
     }, []);

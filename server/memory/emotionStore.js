@@ -21,13 +21,24 @@ function getEmotion(socketId) {
 }
 
 function setEmotion(socketId, emotion) {
+    if (!emotion || typeof emotion !== "object") {
+        return getEmotion(socketId);
+    }
+
     emotionDB[socketId] = {
         ...getEmotion(socketId),
         ...emotion,
     };
+
+    return emotionDB[socketId];
+}
+
+function clearEmotion(socketId) {
+    delete emotionDB[socketId];
 }
 
 module.exports = {
     getEmotion,
     setEmotion,
+    clearEmotion,
 };

@@ -47,7 +47,7 @@ export class LifeController {
     }
 
     // 🌀 Idle motion (subtle sway)
-    handleIdleMotion(deltaTime) {
+    handleIdleMotion(_deltaTime) {
         const sway = Math.sin(Date.now() * 0.001) * 0.02;
 
         if (this.model) {
