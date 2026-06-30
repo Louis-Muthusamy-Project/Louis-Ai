@@ -1,0 +1,24 @@
+{
+  "name": "yuna-electron",
+  "version": "0.1.0",
+  "private": true,
+  "main": "main.js",
+  "type": "commonjs",
+  "scripts": {
+    "dev": "nodemon main.js",
+    "start": "electron ."
+  },
+  "dependencies": {
+    "concurrently": "^10.0.3",
+    "electron": "^32.3.3",
+    "electron-builder": "^26.15.3",
+    "wait-on": "^9.0.10"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.4"
+  },
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

@@ -1,0 +1,129 @@
+.appRoot{
+  height:100vh;
+  width:100vw;
+  background:
+    radial-gradient(900px 520px at 20% 10%, rgba(168,85,247,0.18), transparent 60%),
+    radial-gradient(700px 420px at 70% 20%, rgba(59,130,246,0.14), transparent 55%),
+    linear-gradient(180deg, #0b0620, #060313);
+  color: rgba(255,255,255,0.92);
+  display:flex;
+  flex-direction:column;
+  overflow:hidden;
+}
+.topHeader{
+  height:64px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding:0 18px;
+  border-bottom:1px solid rgba(168,85,247,0.10);
+  background: rgba(12,6,30,0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.avatarWrap{ display:flex; align-items:center; gap:12px; }
+.avatarOrb{
+  width:34px; height:34px; border-radius:999px;
+  background: radial-gradient(circle at 30% 30%, rgba(168,85,247,0.65), rgba(59,130,246,0.25));
+  box-shadow: 0 0 28px rgba(168,85,247,0.35);
+}
+.avatarText{ font-weight:800; letter-spacing:0.3px; }
+.statusWrap{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; }
+.statusLabel{ font-size:11px; color: rgba(255,255,255,0.5); }
+.statusValue{ font-size:13px; color: rgba(255,255,255,0.9); }
+.micIndicator{ display:flex; align-items:center; gap:10px; }
+.micDot{ width:10px; height:10px; border-radius:999px; background: rgba(255,255,255,0.35); box-shadow: 0 0 0 rgba(168,85,247,0); animation: micPulse 1.4s ease-in-out infinite; }
+@keyframes micPulse{ 0%,100%{ transform:scale(0.95); opacity:0.65;} 50%{ transform:scale(1.15); opacity:1;} }
+.micText{ font-size:12px; color: rgba(255,255,255,0.7);} 
+
+.mainSplit{ flex:1; display:flex; min-height:0; }
+.chatPanel{ flex:1; display:flex; flex-direction:column; min-width:0; }
+.chatScroll{
+  flex:1; min-height:0;
+  padding:18px;
+  overflow:auto;
+}
+.chatScroll::-webkit-scrollbar{ width:10px; }
+.chatScroll::-webkit-scrollbar-thumb{ background: rgba(168,85,247,0.18); border-radius:999px; }
+
+.thinkingRow{ display:flex; justify-content:flex-start; padding:6px 0; }
+.thinkingDots{ display:flex; gap:6px; padding:10px 12px; border-radius:16px; background: rgba(0,0,0,0.15); border:1px solid rgba(255,255,255,0.08); backdrop-filter: blur(10px); }
+.thinkingDots span{ width:7px; height:7px; border-radius:999px; background: rgba(168,85,247,0.9); animation: dotBounce 1s infinite ease-in-out; }
+.thinkingDots span:nth-child(2){ animation-delay:0.15s; }
+.thinkingDots span:nth-child(3){ animation-delay:0.3s; }
+@keyframes dotBounce{ 0%,100%{ transform:translateY(0); opacity:0.55;} 50%{ transform:translateY(-4px); opacity:1;} }
+
+.composer{
+  border-top:1px solid rgba(168,85,247,0.10);
+  padding:12px 14px;
+  display:flex;
+  gap:12px;
+  align-items:flex-end;
+  background: rgba(10,5,26,0.35);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.micButton{
+  width:54px; height:54px;
+  border-radius:18px;
+  border:1px solid rgba(168,85,247,0.35);
+  background: radial-gradient(circle at 30% 30%, rgba(168,85,247,0.35), rgba(0,0,0,0.18));
+  box-shadow: 0 0 0 rgba(168,85,247,0);
+  position:relative;
+  overflow:hidden;
+  cursor:pointer;
+}
+.micIcon{
+  position:absolute;
+  inset:0;
+  margin:auto;
+  width:16px;
+  height:22px;
+  background: rgba(255,255,255,0.9);
+  border-radius:10px;
+  clip-path: polygon(0% 0%, 100% 0%, 100% 70%, 70% 100%, 30% 100%, 0% 70%);
+  opacity:0.85;
+}
+.micGlow{
+  position:absolute;
+  width:120px; height:120px;
+  left:50%; top:50%;
+  transform:translate(-50%,-50%);
+  background: radial-gradient(circle, rgba(168,85,247,0.45), rgba(59,130,246,0.0) 65%);
+  filter: blur(2px);
+  animation: micGlowPulse 1.6s ease-in-out infinite;
+  opacity:0.65;
+}
+@keyframes micGlowPulse{ 0%,100%{ transform:translate(-50%,-50%) scale(0.95); opacity:0.55;} 50%{ transform:translate(-50%,-50%) scale(1.05); opacity:1;} }
+
+.inputWrap{ flex:1; }
+.textInput{
+  width:100%;
+  resize:none;
+  max-height:120px;
+  padding:12px 14px;
+  border-radius:18px;
+  border:1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.15);
+  color: rgba(255,255,255,0.92);
+  outline:none;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.textInput::placeholder{ color: rgba(255,255,255,0.45); }
+
+.sendButton{
+  height:54px;
+  min-width:110px;
+  padding:0 18px;
+  border-radius:18px;
+  border:1px solid rgba(59,130,246,0.28);
+  background: linear-gradient(180deg, rgba(59,130,246,0.18), rgba(168,85,247,0.08));
+  color: rgba(255,255,255,0.92);
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+}
+.sendButton:disabled{ cursor:not-allowed; opacity:0.6; }
+.sendLabel{ font-weight:800; letter-spacing:0.2px; }
+

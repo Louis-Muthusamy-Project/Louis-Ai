@@ -1,0 +1,79 @@
+.wrap{
+  position:relative;
+  height:100%;
+  border-right:1px solid rgba(168,85,247,0.12);
+  background:linear-gradient(180deg, rgba(20,8,40,0.65), rgba(9,4,22,0.8));
+  overflow:hidden;
+}
+.cityBg{
+  position:absolute;
+  inset:-20px;
+  background:
+    radial-gradient(900px 500px at 40% 10%, rgba(168,85,247,0.18), transparent 55%),
+    radial-gradient(800px 480px at 70% 25%, rgba(59,130,246,0.14), transparent 55%),
+    radial-gradient(500px 400px at 30% 80%, rgba(168,85,247,0.12), transparent 58%),
+    linear-gradient(180deg, rgba(8,3,20,0.1), rgba(8,3,20,0.85));
+  filter: blur(10px) saturate(1.3);
+}
+.characterWrap{
+  position:absolute;
+  left:50%;
+  top:50%;
+  transform:translate(-50%,-52%);
+  width:420px;
+  height:420px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+.orbGlow{
+  position:absolute;
+  width:340px;
+  height:340px;
+  border-radius:999px;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(168,85,247,0.35), transparent 60%),
+    radial-gradient(circle at 70% 60%, rgba(59,130,246,0.28), transparent 55%);
+  box-shadow:
+    0 0 55px rgba(168,85,247,0.22),
+    0 0 120px rgba(59,130,246,0.10);
+  animation: glowPulse 3.2s ease-in-out infinite;
+}
+@keyframes glowPulse{
+  0%,100%{ transform:scale(0.98); opacity:0.9; }
+  50%{ transform:scale(1.03); opacity:1; }
+}
+.faceSvg{
+  position:relative;
+  width:320px;
+  height:320px;
+}
+.breath{
+  position:absolute;
+  width:420px;
+  height:420px;
+  border-radius:999px;
+  background: radial-gradient(circle at 50% 55%, rgba(168,85,247,0.10), transparent 60%);
+  animation: breath 4.4s ease-in-out infinite;
+}
+@keyframes breath{
+  0%,100%{ transform:scale(0.98); opacity:0.55; }
+  50%{ transform:scale(1.02); opacity:0.9; }
+}
+.idleHints{
+  position:absolute;
+  left:28px;
+  bottom:24px;
+  width:160px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.hintLine{
+  height:10px;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(168,85,247,0.4), rgba(59,130,246,0.12));
+  opacity:0.35;
+  filter: blur(0.2px);
+}
+
