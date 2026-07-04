@@ -1,15 +1,61 @@
-const { GoogleGenAI } = require("@google/genai");
+/**
+ * ==========================================
+ * Gemini Configuration
+ * ==========================================
+ */
 
-const apiKey = process.env.GEMINI_API_KEY;
+module.exports = {
 
-if (!apiKey) {
-  throw new Error(
-    "GEMINI_API_KEY is missing. Please add it to your .env file."
-  );
-}
+    provider: "gemini",
 
-const ai = new GoogleGenAI({
-  apiKey,
-});
+    model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
-module.exports = ai;
+    generationConfig: {
+
+        temperature: 0.8,
+
+        topP: 0.95,
+
+        topK: 40,
+
+        maxOutputTokens: 2048,
+
+        candidateCount: 1
+
+    },
+
+    safetySettings: [
+
+        {
+            category: "HARM_CATEGORY_HARASSMENT",
+            threshold: "BLOCK_ONLY_HIGH"
+        },
+
+        {
+            category: "HARM_CATEGORY_HATE_SPEECH",
+            threshold: "BLOCK_ONLY_HIGH"
+        },
+
+        {
+            category: "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+            threshold: "BLOCK_ONLY_HIGH"
+        },
+
+        {
+            category: "HARM_CATEGORY_DANGEROUS_CONTENT",
+            threshold: "BLOCK_ONLY_HIGH"
+        }
+
+    ],
+
+    retry: {
+
+        maxAttempts: 3,
+
+        retryDelay: 1000
+
+    },
+
+    timeout: 30000
+
+};

@@ -1,91 +1,99 @@
-const ENDING_PUNCTUATION = /[.!?]+$/;
+/**
+ * ==========================================
+ * Memory Service
+ * ------------------------------------------
+ * Handles:
+ * - Short Memory
+ * - Session Memory
+ * - Long Memory (Future MongoDB)
+ * ==========================================
+ */
 
-function cleanValue(value = "") {
-    return value
-        .trim()
-        .replace(ENDING_PUNCTUATION, "")
-        .replace(/\s+/g, " ");
-}
+class MemoryService {
 
-function toTitleCase(value = "") {
-    return value
-        .split(" ")
-        .filter(Boolean)
-        .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(" ");
-}
+    constructor() {
 
-function matchFirst(message, patterns) {
-    for (const pattern of patterns) {
-        const match = message.match(pattern);
-        if (match?.[1]) {
-            return cleanValue(match[1]);
+        this.shortMemory = new Map();
+
+        this.longMemory = new Map();
+
+        this.maxShortMemory = 20;
+
+    }
+
+    getShortMemory(socketId) {
+
+        if (!this.shortMemory.has(socketId)) {
+            this.shortMemory.set(socketId, []);
         }
+
+        return this.shortMemory.get(socketId);
+
     }
 
-    return null;
+    addShortMemory(socketId, role, text) {
+
+        const memory = this.getShortMemory(socketId);
+
+        memory.push({
+            role,
+            text,
+            createdAt: new Date().toISOString()
+        });
+
+        if (memory.length > this.maxShortMemory) {
+            memory.shift();
+        }
+
+    }
+
+    clearShortMemory(socketId) {
+
+        this.shortMemory.delete(socketId);
+
+    }
+
+    saveLongMemory(userId, key, value) {
+
+        if (!this.longMemory.has(userId)) {
+            this.longMemory.set(userId, {});
+        }
+
+        const userMemory = this.longMemory.get(userId);
+
+        userMemory[key] = value;
+
+    }
+
+    getLongMemory(userId) {
+
+        return this.longMemory.get(userId) || {};
+
+    }
+
+    removeLongMemory(userId, key) {
+
+        if (!this.longMemory.has(userId)) {
+            return;
+        }
+
+        const userMemory = this.longMemory.get(userId);
+
+        delete userMemory[key];
+
+    }
+
+    getSummary(socketId) {
+
+        const memory = this.getShortMemory(socketId);
+
+        return memory.map(item => ({
+            role: item.role,
+            text: item.text
+        }));
+
+    }
+
 }
 
-function extractMemory(userMessage = "") {
-    if (typeof userMessage !== "string") {
-        return null;
-    }
-
-    const message = cleanValue(userMessage);
-
-    const name = matchFirst(message, [
-        /\bmy name is\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-        /\bi am\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-        /\bi'm\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-        /\bcall me\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-    ]);
-
-    if (name) {
-        return {
-            type: "name",
-            value: toTitleCase(name),
-        };
-    }
-
-    const nickname = matchFirst(message, [
-        /\bmy nickname is\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-        /\bmy nick name is\s+([a-zA-Z][a-zA-Z\s'-]{0,40})$/i,
-    ]);
-
-    if (nickname) {
-        return {
-            type: "nickname",
-            value: toTitleCase(nickname),
-        };
-    }
-
-    const language = matchFirst(message, [
-        /\bmy favou?rite language is\s+([a-zA-Z][a-zA-Z\s+-]{0,40})$/i,
-        /\bi prefer\s+([a-zA-Z][a-zA-Z\s+-]{0,40})\s+language$/i,
-    ]);
-
-    if (language) {
-        return {
-            type: "language",
-            value: toTitleCase(language),
-        };
-    }
-
-    const like = matchFirst(message, [
-        /\bi like\s+(.{2,80})$/i,
-        /\bi love\s+(.{2,80})$/i,
-    ]);
-
-    if (like) {
-        return {
-            type: "like",
-            value: like.toLowerCase(),
-        };
-    }
-
-    return null;
-}
-
-module.exports = {
-    extractMemory,
-};
+module.exports = new MemoryService();

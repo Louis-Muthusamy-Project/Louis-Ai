@@ -1,26 +1,98 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import ChatMessageBubble from '../../components/ChatMessageBubble/ChatMessageBubble';
-import CharacterPanel from '../../components/CharacterPanel/CharacterPanel';
-import styles from './chatView.module.css';
-import { useChat } from '../../hooks/useChat';
+import React, { useEffect, useRef, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+
+import ChatMessageBubble from "../../components/ChatMessageBubble/ChatMessageBubble";
+import CharacterPanel from "../../components/CharacterPanel/CharacterPanel";
+
+import DesktopTitleBar from "../../components/Desktop/DesktopTitleBar";
+import "../../components/Desktop/DesktopTitleBar.css";
+
+import styles from "./chatView.module.css";
+
+import SocketService from "../../services/socketService";
+import useChatStore from "../../store/chatStore";
+
+import MicrophoneService from "../../services/microphoneService";
 
 export default function ChatView() {
-  const { messages, sendMessage, isTyping, connectionStatus } = useChat();
+
+  const [recording, setRecording] = useState(false);
+
+  const messages = useChatStore(state => state.messages);
+
+  const typing = useChatStore(state => state.typing);
+
+  const thinking = useChatStore(state => state.thinking);
+
+  const connected = useChatStore(state => state.connected);
+
+  const streamingText = useChatStore(state => state.streamingText);
+
+  const addMessage = useChatStore(state => state.addMessage);
+
   const [input, setInput] = useState('');
   const messagesEndRef = useRef(null);
 
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
-  }, [messages.length]);
+
+    messagesEndRef.current?.scrollIntoView({
+
+      behavior: "smooth",
+
+      block: "end"
+
+    });
+
+  }, [
+
+    messages,
+
+    streamingText,
+
+    typing
+
+  ]);
 
   function onSend() {
-    const text = input.trim();
-    if (!text || isTyping) return;
 
-    if (sendMessage(text)) {
-      setInput('');
-    }
+    const text = input.trim();
+
+    if (!text) return;
+
+    if (typing || thinking) return;
+
+    if (!SocketService.isConnected()) return;
+
+    const id = crypto.randomUUID();
+
+    addMessage({
+
+      id,
+
+      role: "user",
+
+      text,
+
+      createdAt: new Date().toISOString()
+
+    });
+
+    SocketService.emit(
+
+      "yuna:message:send",
+
+      {
+
+        id,
+
+        text
+
+      }
+
+    );
+
+    setInput("");
+
   }
 
   function onKeyDown(e) {
@@ -32,6 +104,7 @@ export default function ChatView() {
 
   return (
     <div className={styles.appRoot}>
+      <DesktopTitleBar />
       <div className={styles.topHeader}>
         <div className={styles.avatarWrap}>
           <div className={styles.avatarOrb} />
@@ -40,20 +113,26 @@ export default function ChatView() {
 
         <div className={styles.statusWrap}>
           <span className={styles.statusLabel}>Status</span>
+
           <span className={styles.statusValue}>
-            {connectionStatus === 'connected' ? 'Listening' : connectionStatus}
+            {connected ? "🟢 Connected" : "🔴 Disconnected"}
           </span>
         </div>
 
         <div className={styles.micIndicator} aria-live="polite">
           <span className={styles.micDot} />
-          <span className={styles.micText}>{isTyping ? 'Thinking...' : 'Mic ready'}</span>
+          <span className={styles.micText}>{thinking ? "Thinking..." : "Mic ready"}</span>
         </div>
       </div>
 
       <div className={styles.mainSplit}>
-        <CharacterPanel isSpeaking={isTyping} />
+        <CharacterPanel
 
+          isSpeaking={typing}
+
+          thinking={thinking}
+
+        />
         <div className={styles.chatPanel}>
           <div className={styles.chatScroll}>
             <AnimatePresence initial={false}>
@@ -70,7 +149,7 @@ export default function ChatView() {
               ))}
             </AnimatePresence>
 
-            {isTyping && (
+            {thinking && (
               <motion.div
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -83,6 +162,31 @@ export default function ChatView() {
                 </div>
               </motion.div>
             )}
+            {typing && streamingText && (
+
+              <motion.div
+
+                initial={{ opacity: 0 }}
+
+                animate={{ opacity: 1 }}
+
+              >
+
+                <ChatMessageBubble
+
+                  message={{
+
+                    role: "assistant",
+
+                    text: streamingText
+
+                  }}
+
+                />
+
+              </motion.div>
+
+            )}
 
             <div ref={messagesEndRef} />
           </div>
@@ -93,7 +197,30 @@ export default function ChatView() {
               className={styles.micButton}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              animate={{ boxShadow: isTyping ? '0 0 0 1px rgba(168,85,247,0.35), 0 0 28px rgba(168,85,247,0.5)' : undefined }}
+              animate={{ boxShadow: typing ? '0 0 0 1px rgba(168,85,247,0.35), 0 0 28px rgba(168,85,247,0.5)' : undefined }}
+              onClick={async () => {
+
+                if (!recording) {
+
+                  await MicrophoneService.start();
+
+                  setRecording(true);
+
+                }
+
+                else {
+
+                  const audioBlob =
+
+                    await MicrophoneService.stop();
+
+                  setRecording(false);
+
+                  console.log(audioBlob);
+
+                }
+
+              }}
             >
               <span className={styles.micIcon} />
               <span className={styles.micGlow} />
@@ -105,9 +232,21 @@ export default function ChatView() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder='Say “Hey Yuna” or type a message...'
+                placeholder={
+
+                  thinking
+
+                    ? "Yuna is thinking..."
+
+                    : typing
+
+                      ? "Yuna is replying..."
+
+                      : "Say 'Hey Yuna' or type a message..."
+
+                }
                 rows={1}
-                disabled={connectionStatus !== 'connected'}
+                disabled={!connected}
               />
             </div>
 
@@ -117,7 +256,23 @@ export default function ChatView() {
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onSend}
-              disabled={!input.trim() || isTyping || connectionStatus !== 'connected'}
+              disabled={
+
+                !input.trim()
+
+                ||
+
+                typing
+
+                ||
+
+                thinking
+
+                ||
+
+                !connected
+
+              }
             >
               <span className={styles.sendLabel}>Send</span>
             </motion.button>

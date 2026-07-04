@@ -1,36 +1,56 @@
-const express = require("express");
-const http = require("http");
-const { Server } = require("socket.io");
-const cors = require("cors");
 const path = require("path");
 
-require("dotenv").config();
-require("dotenv").config({ path: path.join(__dirname, "..", ".env") });
-
-const socketHandler = require("./socket/socketHandler");
-
-const app = express();
-const server = http.createServer(app);
-const CLIENT_ORIGIN = process.env.CLIENT_ORIGIN || "*";
-
-app.use(cors({ origin: CLIENT_ORIGIN }));
-app.use(express.json());
-
-const io = new Server(server, {
-    cors: {
-        origin: CLIENT_ORIGIN,
-    },
+require("dotenv").config({
+    path: path.join(__dirname, "..", ".env")
 });
 
-// Attach socket layer
-socketHandler(io);
+const initializeModules = require("./bootstrap");
 
-app.get("/", (req, res) => {
-    res.send("Yuna Server Running...");
-});
+const { createApp } = require("./config/server");
+const { createSocketServer } = require("./config/socket");
+const { registerSocketHandlers } = require("./socket/socketHandler");
 
-const PORT = process.env.PORT || 5000;
+const PORT = Number(process.env.PORT) || 4000;
 
-server.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-});
+async function startServer() {
+
+    try {
+
+        // Initialize Yuna modules
+        await initializeModules();
+
+        // Create Express + HTTP server
+        const { app, server } = createApp();
+
+        // Create Socket.IO
+        const io = createSocketServer(server);
+
+        // Register socket handlers
+        registerSocketHandlers(io);
+
+        // Start server
+        server.listen(PORT, () => {
+
+            console.log("==================================");
+            console.log("      YUNA AI SERVER STARTED");
+            console.log("==================================");
+            console.log(`Server : http://localhost:${PORT}`);
+            console.log(`Mode   : ${process.env.NODE_ENV || "development"}`);
+            console.log("==================================");
+
+        });
+
+    }
+
+    catch (error) {
+
+        console.error("Failed to start server");
+        console.error(error);
+
+        process.exit(1);
+
+    }
+
+}
+
+startServer();
