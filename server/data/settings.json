@@ -1,0 +1,10 @@
+{
+  "theme": "dark",
+  "provider": "gemini",
+  "model": "gemini-2.5-flash",
+  "voice": "edge",
+  "voiceName": "en-US-AvaMultilingualNeural",
+  "streamSpeed": 30,
+  "memory": true,
+  "debug": false
+}

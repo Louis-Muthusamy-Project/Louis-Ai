@@ -8,8 +8,16 @@ class GeminiProvider extends BaseAIProvider {
 
         super();
 
+        if (!process.env.GEMINI_API_KEY) {
+
+            throw new Error("GEMINI_API_KEY is missing.");
+
+        }
+
         this.client = new GoogleGenAI({
+
             apiKey: process.env.GEMINI_API_KEY
+
         });
 
         this.model = geminiConfig.model;
@@ -17,76 +25,144 @@ class GeminiProvider extends BaseAIProvider {
     }
 
     getName() {
+
         return "gemini";
+
     }
 
     async generate(contents) {
 
-        const response = await this.client.models.generateContent({
+        try {
 
-            model: this.model,
+            const response = await this.client.models.generateContent({
 
-            contents,
+                model: this.model,
 
-            config: geminiConfig.generationConfig
+                contents,
 
-        });
+                config: geminiConfig.generationConfig
 
-        return response.text || "";
+            });
+
+            if (!response) {
+
+                throw new Error("Gemini returned no response.");
+
+            }
+
+            const text = response.text?.trim();
+
+            if (!text) {
+
+                throw new Error("Gemini returned an empty response.");
+
+            }
+
+            return text;
+
+        }
+
+        catch (error) {
+
+            console.error("[GeminiProvider]", error);
+
+            throw new Error(
+
+                "Unable to generate AI response."
+
+            );
+
+        }
 
     }
 
     async stream(contents, callbacks = {}) {
 
-        /**
-         * Temporary implementation.
-         * Next step will replace this with
-         * Gemini native streaming.
-         */
+        const {
 
-        const text = await this.generate(contents);
+            onStart,
 
-        if (callbacks.onStart) {
-            await callbacks.onStart();
-        }
+            onChunk,
 
-        const words = text.split(/\s+/);
+            onComplete,
 
-        let current = "";
+            onError
 
-        for (const word of words) {
+        } = callbacks;
 
-            current += (current ? " " : "") + word;
+        try {
 
-            if (callbacks.onChunk) {
+            const text = await this.generate(contents);
 
-                await callbacks.onChunk({
+            if (typeof onStart === "function") {
 
-                    chunk: word,
+                await onStart();
 
-                    fullText: current,
+            }
 
-                    done: false
+            const words = text.split(/\s+/);
+
+            let current = "";
+
+            for (const word of words) {
+
+                current += (current ? " " : "") + word;
+
+                if (typeof onChunk === "function") {
+
+                    await onChunk({
+
+                        chunk: word,
+
+                        fullText: current,
+
+                        done: false
+
+                    });
+
+                }
+
+                await this.delay(30);
+
+            }
+
+            if (typeof onComplete === "function") {
+
+                await onComplete({
+
+                    text: current,
+
+                    done: true
 
                 });
 
             }
 
-        }
-
-        if (callbacks.onComplete) {
-
-            await callbacks.onComplete({
-
-                text: current,
-
-                done: true
-
-            });
+            return current;
 
         }
 
-        return current;
+        catch (error) {
+
+            if (typeof onError === "function") {
+
+                await onError(error);
+
+            }
+
+            throw error;
+
+        }
+
+    }
+
+    delay(ms) {
+
+        return new Promise(resolve => {
+
+            setTimeout(resolve, ms);
+
+        });
 
     }
 

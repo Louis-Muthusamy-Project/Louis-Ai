@@ -1,0 +1,103 @@
+.container{
+
+    padding:24px;
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:24px;
+
+    color:white;
+
+}
+
+.group{
+
+    display:flex;
+
+    flex-direction:column;
+
+    gap:10px;
+
+}
+
+.group h3{
+
+    margin:0;
+
+    color:#a855f7;
+
+    font-size:18px;
+
+}
+
+.group label{
+
+    font-size:13px;
+
+    opacity:.8;
+
+}
+
+.group input,
+
+.group select{
+
+    height:42px;
+
+    border:none;
+
+    border-radius:8px;
+
+    background:#2b2b31;
+
+    color:white;
+
+    padding:0 12px;
+
+}
+
+.group input[type="range"]{
+
+    padding:0;
+
+}
+
+.switchRow{
+
+    display:flex;
+
+    justify-content:space-between;
+
+    align-items:center;
+
+}
+
+.saveButton{
+
+    margin-top:10px;
+
+    height:46px;
+
+    border:none;
+
+    border-radius:10px;
+
+    background:#7c3aed;
+
+    color:white;
+
+    cursor:pointer;
+
+    font-size:15px;
+
+    font-weight:600;
+
+}
+
+.saveButton:hover{
+
+    background:#6d28d9;
+
+}

@@ -1,0 +1,113 @@
+.composer{
+
+    display:flex;
+
+    gap:12px;
+
+    padding:16px;
+
+    border-top:1px solid rgba(255,255,255,.08);
+
+    background:#15151b;
+
+}
+
+.input{
+
+    flex:1;
+
+    resize:none;
+
+    border:none;
+
+    outline:none;
+
+    border-radius:12px;
+
+    background:#25252d;
+
+    color:white;
+
+    padding:12px 16px;
+
+    font-size:15px;
+
+    min-height:48px;
+
+}
+
+.micButton{
+
+    width:50px;
+
+    height:50px;
+
+    border:none;
+
+    border-radius:50%;
+
+    cursor:pointer;
+
+    background:#27272a;
+
+    color:white;
+
+    font-size:18px;
+
+}
+
+.recording{
+
+    background:#dc2626;
+
+    animation:pulse 1s infinite;
+
+}
+
+.sendButton{
+
+    width:110px;
+
+    border:none;
+
+    border-radius:12px;
+
+    cursor:pointer;
+
+    background:#7c3aed;
+
+    color:white;
+
+    font-weight:600;
+
+}
+
+.sendButton:disabled{
+
+    opacity:.5;
+
+    cursor:not-allowed;
+
+}
+
+@keyframes pulse{
+
+    0%{
+
+        transform:scale(1);
+
+    }
+
+    50%{
+
+        transform:scale(1.08);
+
+    }
+
+    100%{
+
+        transform:scale(1);
+
+    }
+
+}

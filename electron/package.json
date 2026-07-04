@@ -5,7 +5,7 @@
   "main": "main.js",
   "type": "commonjs",
   "scripts": {
-    "dev": "nodemon main.js",
+    "dev": "electron .",
     "start": "electron ."
   },
   "dependencies": {
@@ -22,3 +22,5 @@
   "author": "",
   "license": "ISC"
 }
+
+  
