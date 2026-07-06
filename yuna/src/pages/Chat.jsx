@@ -22,7 +22,6 @@ export default function Chat() {
                 style={{
                     height: "400px",
                     overflowY: "auto",
-                    border: "1px solid #ccc",
                     padding: "10px",
                 }}
             >

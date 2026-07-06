@@ -34,11 +34,11 @@
 
     border-radius:50%;
 
-    background:linear-gradient(
-        135deg,
-        #8b5cf6,
-        #3b82f6
-    );
+    background: url('https://res.cloudinary.com/dp4omlmzn/image/upload/v1783188927/Screenshot_2026-07-04_234010-removebg-preview_jnpupf.png');
+
+    background-size: cover;
+
+    background-position: center;
 
 }
 

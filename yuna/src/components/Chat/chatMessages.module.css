@@ -12,6 +12,10 @@
 
     gap:14px;
 
+    scrollbar-width: none; 
+  
+  -ms-overflow-style: none;
+
 }
 
 .thinking{
