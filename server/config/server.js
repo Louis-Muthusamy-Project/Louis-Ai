@@ -21,7 +21,7 @@ function createApp() {
 
     cors({
 
-      origin: process.env.CLIENT_URL || "http://localhost:5173",
+      origin: process.env.CLIENT_URL || "https://louis-yuna.onrender.com",
 
       methods: ["GET", "POST"],
 

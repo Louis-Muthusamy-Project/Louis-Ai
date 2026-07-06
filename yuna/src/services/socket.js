@@ -2,7 +2,7 @@
 import { io } from "socket.io-client";
 
 export const socket = io(
-  import.meta.env.VITE_SOCKET_URL || "http://localhost:4000",
+  import.meta.env.VITE_SOCKET_URL || "https://louis-yuna.onrender.com",
   {
     autoConnect: false,
     reconnection: true,

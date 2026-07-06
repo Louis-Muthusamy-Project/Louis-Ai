@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:4000/api/settings";
+const BASE_URL = "https://louis-yuna.onrender.com/api/settings";
 
 class SettingsService {
 

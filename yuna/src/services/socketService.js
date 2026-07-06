@@ -26,7 +26,7 @@ class SocketService {
 
         }
 
-        this.socket = io("http://localhost:3000", {
+        this.socket = io("https://louis-yuna.onrender.com", {
 
             transports: ["websocket"],
 
