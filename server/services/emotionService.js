@@ -1,142 +1,33 @@
+const Emotion = require("../domain/Emotion");
+const Kernel = require("../core/Kernel");
+
 /**
  * ==========================================
- * Emotion Service
- * ------------------------------------------
- * Detects Yuna's emotional state from
- * generated responses.
+ * EmotionService - Refactored Service Class
  * ==========================================
  */
-
 class EmotionService {
-
-    constructor() {
-
-        this.rules = {
-
-            happy: [
-                "happy",
-                "glad",
-                "awesome",
-                "great",
-                "yay",
-                "love",
-                "😊",
-                "😄",
-                "😁",
-                "❤️"
-            ],
-
-            sad: [
-                "sad",
-                "sorry",
-                "miss",
-                "cry",
-                "😭",
-                "😢"
-            ],
-
-            excited: [
-                "wow",
-                "amazing",
-                "fantastic",
-                "excited",
-                "🔥",
-                "✨",
-                "🤩"
-            ],
-
-            angry: [
-                "angry",
-                "annoy",
-                "hate",
-                "😠",
-                "😡"
-            ],
-
-            confused: [
-                "confused",
-                "don't understand",
-                "not sure",
-                "🤔"
-            ]
-        };
-
+    constructor(kernel) {
+        this.kernel = kernel;
     }
 
     detect(text = "") {
-
-        const lower = text.toLowerCase();
-
-        for (const emotion of Object.keys(this.rules)) {
-
-            const words = this.rules[emotion];
-
-            for (const word of words) {
-
-                if (lower.includes(word.toLowerCase())) {
-                    return emotion;
-                }
-
-            }
-
-        }
-
-        return "neutral";
-
+        return Emotion.detect(text);
     }
 
     getAnimation(emotion) {
-
-        switch (emotion) {
-
-            case "happy":
-                return "smile";
-
-            case "excited":
-                return "excited";
-
-            case "sad":
-                return "sad";
-
-            case "angry":
-                return "angry";
-
-            case "confused":
-                return "thinking";
-
-            default:
-                return "idle";
-
-        }
-
+        return Emotion.getAnimation(emotion);
     }
 
     getVoiceTone(emotion) {
-
-        switch (emotion) {
-
-            case "happy":
-                return "cheerful";
-
-            case "excited":
-                return "energetic";
-
-            case "sad":
-                return "soft";
-
-            case "angry":
-                return "firm";
-
-            case "confused":
-                return "thinking";
-
-            default:
-                return "normal";
-
-        }
-
+        return Emotion.getVoiceTone(emotion);
     }
-
 }
 
-module.exports = new EmotionService();
+const wrapper = {
+    detect: (t) => Kernel.get("emotionService").detect(t),
+    getAnimation: (e) => Kernel.get("emotionService").getAnimation(e),
+    getVoiceTone: (e) => Kernel.get("emotionService").getVoiceTone(e)
+};
+
+module.exports = Object.assign(wrapper, { EmotionService });

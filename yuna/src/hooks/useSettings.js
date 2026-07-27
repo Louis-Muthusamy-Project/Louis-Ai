@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useCallback, useEffect } from "react";
 
 import SettingsService from "../services/settingsService";
 
@@ -24,7 +24,7 @@ export default function useSettings() {
 
     );
 
-    async function load() {
+    const load = useCallback(async () => {
 
         try {
 
@@ -44,7 +44,7 @@ export default function useSettings() {
 
         }
 
-    }
+    }, [setLoading, setSettings]);
 
     async function save() {
 
@@ -60,7 +60,7 @@ export default function useSettings() {
 
         load();
 
-    }, []);
+    }, [load]);
 
     return {
 

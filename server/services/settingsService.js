@@ -1,84 +1,43 @@
-const fs = require("fs");
-const path = require("path");
+const Kernel = require("../core/Kernel");
 
+/**
+ * ==========================================
+ * SettingsService - Service Layer Class
+ * ==========================================
+ */
 class SettingsService {
+    constructor(kernel) {
+        this.kernel = kernel;
+    }
 
-    constructor() {
-
-        this.file = path.join(
-
-            __dirname,
-
-            "..",
-
-            "data",
-
-            "settings.json"
-
-        );
-
+    get store() {
+        return this.kernel.get("settingsFileStore");
     }
 
     getSettings() {
-
-        if (!fs.existsSync(this.file)) {
-
-            return {};
-
-        }
-
-        const raw = fs.readFileSync(
-
-            this.file,
-
-            "utf8"
-
-        );
-
-        return JSON.parse(raw);
-
+        return this.store.read();
     }
 
     saveSettings(settings) {
-
-        fs.writeFileSync(
-
-            this.file,
-
-            JSON.stringify(
-
-                settings,
-
-                null,
-
-                4
-
-            )
-
-        );
-
+        this.store.write(settings);
         return settings;
-
     }
 
     updateSettings(values) {
-
         const current = this.getSettings();
-
         const updated = {
-
             ...current,
-
             ...values
-
         };
-
         this.saveSettings(updated);
-
         return updated;
-
     }
-
 }
 
-module.exports = new SettingsService();
+const wrapper = {
+    getSettings: () => Kernel.get("settingsService").getSettings(),
+    saveSettings: (s) => Kernel.get("settingsService").saveSettings(s),
+    updateSettings: (v) => Kernel.get("settingsService").updateSettings(v)
+};
+
+module.exports = Object.assign(wrapper, { SettingsService });

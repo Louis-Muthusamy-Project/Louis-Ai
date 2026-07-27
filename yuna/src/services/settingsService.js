@@ -1,6 +1,8 @@
 import axios from "axios";
 
-const BASE_URL = "https://louis-yuna.onrender.com/api/settings";
+const BASE_URL =
+    (import.meta.env.VITE_API_URL || "http://localhost:3000") +
+    "/api/settings";
 
 class SettingsService {
 

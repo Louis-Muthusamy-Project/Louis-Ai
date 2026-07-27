@@ -6,11 +6,11 @@ import useChatStore from "../store/chatStore";
 
 export default function ChatProvider({ children }) {
     
-    CharacterStateMachine.idle();
+
 
     useEffect(() => {
 
-        const store = useChatStore.getState();
+        CharacterStateMachine.idle();
 
         SocketService.connect();
 
@@ -98,10 +98,6 @@ export default function ChatProvider({ children }) {
             chat.addMessage(reply);
 
             chat.setEmotion(reply.emotion);
-
-            CharacterStateMachine.emotion(reply.emotion);
-
-            useChatStore.getState().setEmotion(reply.emotion);
 
             CharacterStateMachine.emotion(reply.emotion);
 

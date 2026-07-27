@@ -26,7 +26,11 @@ class SocketService {
 
         }
 
-        this.socket = io("https://louis-yuna.onrender.com", {
+        const url =
+            import.meta.env.VITE_SOCKET_URL ||
+            "http://localhost:3000";
+
+        this.socket = io(url, {
 
             transports: ["websocket"],
 

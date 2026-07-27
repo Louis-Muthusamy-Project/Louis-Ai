@@ -25,8 +25,6 @@ export default function CharacterPanel() {
 
     isHappy,
 
-    isSad,
-
     isExcited
 
   } = useCharacterState();

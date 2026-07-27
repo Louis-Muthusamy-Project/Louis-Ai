@@ -1,6 +1,6 @@
 import { create } from "zustand";
 
-const useChatStore = create((set, get) => ({
+const useChatStore = create((set) => ({
 
     messages: [],
 

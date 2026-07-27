@@ -1,4 +1,5 @@
-const { app } = require("electron");
+const electron = require("electron");
+const { app } = electron;
 
 const { createMainWindow } = require("./window");
 
