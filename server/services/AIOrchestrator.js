@@ -48,12 +48,19 @@ class AIOrchestrator {
             const toolResults = await this.toolRouter.route(plan);
 
             // 5. Context Building
+            const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
             const context = this.contextService.build(socketId, {
                 emotion: currentEmotion,
                 userMessage,
                 toolResults,
-                intent: intentResult.intent
+                intent: intentResult.intent,
+                userProfile: cognitiveMemory.userProfile,
+                memory: cognitiveMemory.relevantMemories,
+                relationship: cognitiveMemory.relationship,
+                timeline: cognitiveMemory.timeline,
+                goals: cognitiveMemory.goals,
+                projects: cognitiveMemory.projects
             });
 
             // 6. Compile Prompt using Prompt Builder v2
@@ -139,12 +146,19 @@ class AIOrchestrator {
             const toolResults = await this.toolRouter.route(plan);
 
             // 5. Context Building
+            const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
             const context = this.contextService.build(socketId, {
                 emotion: currentEmotion,
                 userMessage,
                 toolResults,
-                intent: intentResult.intent
+                intent: intentResult.intent,
+                userProfile: cognitiveMemory.userProfile,
+                memory: cognitiveMemory.relevantMemories,
+                relationship: cognitiveMemory.relationship,
+                timeline: cognitiveMemory.timeline,
+                goals: cognitiveMemory.goals,
+                projects: cognitiveMemory.projects
             });
 
             // 6. Compile Prompt using Prompt Builder v2

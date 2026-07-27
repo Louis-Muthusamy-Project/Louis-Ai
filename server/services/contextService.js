@@ -25,25 +25,36 @@ class ContextService {
             userProfile = {},
             desktopState = {},
             toolResults = [],
-            intent = "CHAT"
+            intent = "CHAT",
+            relationship = {},
+            timeline = [],
+            goals = [],
+            projects = [],
+            memory = null
         } = options;
 
         const history = this.conversationService.getHistory(socketId);
 
-        const memory = this.memoryService
-            .getSummary(socketId)
-            .map(item => `${item.role}: ${item.text}`);
+        const retrievedMemory = memory !== null 
+            ? memory 
+            : this.memoryService
+                .getSummary(socketId)
+                .map(item => `${item.role}: ${item.text}`);
 
         return {
             history,
-            memory,
+            memory: retrievedMemory,
             emotion,
             currentTime: new Date(),
             userMessage,
             userProfile,
             desktopState,
             toolResults,
-            intent
+            intent,
+            relationship,
+            timeline,
+            goals,
+            projects
         };
     }
 }

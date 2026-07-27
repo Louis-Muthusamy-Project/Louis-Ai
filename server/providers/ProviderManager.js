@@ -85,6 +85,16 @@ class ProviderManager {
 
         return text;
     }
+
+    async embed(text) {
+        if (!this.provider) {
+            throw new Error("No active AI provider configured.");
+        }
+        if (typeof this.provider.embed === "function") {
+            return this.provider.embed(text);
+        }
+        throw new Error("Active AI provider does not support embeddings.");
+    }
 }
 
 module.exports = ProviderManager;

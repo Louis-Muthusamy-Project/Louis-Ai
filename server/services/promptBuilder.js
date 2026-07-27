@@ -14,12 +14,17 @@ class PromptBuilder {
     build(options = {}) {
         const {
             history = [],
-            memory = [],
+            memory = [], // semantic memories list
             emotion = "happy",
             currentTime = new Date(),
             userMessage = "",
             toolResults = [],
-            intent = "CHAT"
+            intent = "CHAT",
+            userProfile = {},
+            relationship = {},
+            timeline = [],
+            goals = [],
+            projects = []
         } = options;
 
         let prompt = "";
@@ -27,12 +32,43 @@ class PromptBuilder {
         prompt += YUNA_SYSTEM_PROMPT + "\n\n";
         prompt += `Current Time: ${currentTime.toLocaleString()}\n`;
         prompt += `Current Emotion: ${emotion}\n`;
-        prompt += `Detected Intent: ${intent}\n\n`;
+        prompt += `Detected Intent: ${intent}\n`;
+        if (relationship && relationship.level) {
+            prompt += `Relationship Level: ${relationship.level}/10 (Points: ${relationship.points})\n`;
+        }
+        prompt += "\n";
+
+        if (userProfile && (userProfile.name || userProfile.job || (userProfile.hobbies && userProfile.hobbies.length))) {
+            prompt += "=== User Profile ===\n";
+            if (userProfile.name) prompt += `- Name: ${userProfile.name}\n`;
+            if (userProfile.job) prompt += `- Job: ${userProfile.job}\n`;
+            if (userProfile.birthday) prompt += `- Birthday: ${userProfile.birthday}\n`;
+            if (userProfile.hobbies && userProfile.hobbies.length) {
+                prompt += `- Hobbies: ${userProfile.hobbies.join(", ")}\n`;
+            }
+            prompt += "\n";
+        }
 
         if (memory.length) {
-            prompt += "=== Important User Memory ===\n";
+            prompt += "=== Retrieved Long-term Memories ===\n";
             memory.forEach(item => {
                 prompt += `- ${item}\n`;
+            });
+            prompt += "\n";
+        }
+
+        if (goals && goals.length) {
+            prompt += "=== User Goals ===\n";
+            goals.forEach(g => {
+                prompt += `- ${g}\n`;
+            });
+            prompt += "\n";
+        }
+
+        if (projects && projects.length) {
+            prompt += "=== Active Projects ===\n";
+            projects.forEach(p => {
+                prompt += `- ${p}\n`;
             });
             prompt += "\n";
         }
@@ -61,8 +97,9 @@ class PromptBuilder {
 
         prompt += `User: ${userMessage}\n\n`;
         prompt += "Response Guidelines:\n";
-        prompt += "1. Incorporate the Tool Execution Results naturally if relevant to the User's query.\n";
-        prompt += "2. Respond in character as Yuna AI Companion.\n\n";
+        prompt += "1. Incorporate User Profile details, Goals, Projects, and Long-term Memories naturally in character.\n";
+        prompt += "2. Reference the Tool Execution Results naturally if relevant to the User's query.\n";
+        prompt += "3. Align voice tone and dialogue complexity to matches the Relationship Level.\n\n";
         prompt += "Reply as Yuna:";
 
         return prompt;

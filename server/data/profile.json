@@ -1,0 +1,32 @@
+{
+    "user": {
+        "name": null,
+        "birthday": null,
+        "hobbies": [
+            "photography"
+        ],
+        "job": null
+    },
+    "preferences": {
+        "likes": [
+            "photography"
+        ],
+        "dislikes": [],
+        "topicsOfInterest": [
+            "photography"
+        ]
+    },
+    "goals": [
+        "Complete Yuna AI architecture refactoring"
+    ],
+    "projects": [
+        "Yuna companion app"
+    ],
+    "relationship": {
+        "level": 1,
+        "points": 1,
+        "lastInteraction": "2026-07-27T07:59:13.243Z",
+        "interactionCount": 1
+    },
+    "timeline": []
+}

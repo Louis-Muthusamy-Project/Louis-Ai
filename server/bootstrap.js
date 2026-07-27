@@ -7,6 +7,7 @@ const StateMachine = require("./core/StateMachine");
 
 const SettingsFileStore = require("./infrastructure/SettingsFileStore");
 const SessionStore = require("./infrastructure/SessionStore");
+const MemoryFileStore = require("./infrastructure/MemoryFileStore");
 
 const ProviderManager = require("./providers/ProviderManager");
 
@@ -32,6 +33,7 @@ function registerBindings() {
     // Infrastructure
     Kernel.register("settingsFileStore", new SettingsFileStore());
     Kernel.register("sessionStore", new SessionStore());
+    Kernel.register("memoryFileStore", new MemoryFileStore());
     
     // Providers
     Kernel.register("providerManager", ProviderManager);

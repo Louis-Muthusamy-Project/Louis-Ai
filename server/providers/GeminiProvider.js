@@ -104,6 +104,32 @@ class GeminiProvider extends BaseAIProvider {
         }
     }
 
+    async embed(text) {
+        try {
+            if (!text || !text.trim()) {
+                throw new Error("Cannot embed empty text.");
+            }
+            // gemini-embedding-001 response shape: { embeddings: [{ values: float[] }] }
+            const response = await this.client.models.embedContent({
+                model: "gemini-embedding-001",
+                contents: text
+            });
+
+            if (
+                response &&
+                Array.isArray(response.embeddings) &&
+                response.embeddings.length > 0 &&
+                Array.isArray(response.embeddings[0].values)
+            ) {
+                return response.embeddings[0].values;
+            }
+            throw new Error("Embedding response is missing vector values.");
+        } catch (error) {
+            console.error("[GeminiProvider] Embedding generation failed:", error.message);
+            throw error;
+        }
+    }
+
     delay(ms) {
         return new Promise(resolve => {
             setTimeout(resolve, ms);

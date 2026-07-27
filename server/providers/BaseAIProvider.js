@@ -8,6 +8,10 @@ class BaseAIProvider {
         throw new Error("stream() not implemented.");
     }
 
+    async embed(text) {
+        throw new Error("embed() not implemented.");
+    }
+
     getName() {
         return "base";
     }
