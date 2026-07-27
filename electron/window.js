@@ -45,7 +45,7 @@ function createMainWindow() {
 
                 __dirname,
 
-                "../client/dist/index.html"
+                "../yuna/dist/index.html"
 
             )
 
