@@ -16,6 +16,7 @@ class PromptBuilder {
             history = [],
             memory = [], // semantic memories list
             emotion = "happy",
+            emotionState = null,  // EmotionState value object summary
             currentTime = new Date(),
             userMessage = "",
             toolResults = [],
@@ -37,6 +38,22 @@ class PromptBuilder {
             prompt += `Relationship Level: ${relationship.level}/10 (Points: ${relationship.points})\n`;
         }
         prompt += "\n";
+
+        // Yuna's current emotional state (cognitive axes)
+        if (emotionState) {
+            prompt += "=== Yuna's Current Emotional State ===\n";
+            prompt += `${emotionState._promptSummary || [
+                `Primary Emotion: ${emotionState.primary || emotion}`,
+                `Mood: ${emotionState.mood ?? 0} (${emotionState.mood > 0.3 ? 'positive' : emotionState.mood < -0.3 ? 'negative' : 'balanced'})`,
+                `Energy: ${emotionState.energy ?? 0.7}`,
+                `Curiosity: ${emotionState.curiosity ?? 0.5}`,
+                `Stress: ${emotionState.stress ?? 0.1}`,
+                `Trust: ${emotionState.trust ?? 0.5}`,
+                `Confidence: ${emotionState.confidence ?? 0.6}`,
+                `Focus: ${emotionState.focus ?? 0.5}`
+            ].join('\n')}\n`;
+            prompt += "\n";
+        }
 
         if (userProfile && (userProfile.name || userProfile.job || (userProfile.hobbies && userProfile.hobbies.length))) {
             prompt += "=== User Profile ===\n";

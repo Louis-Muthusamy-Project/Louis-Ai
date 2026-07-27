@@ -21,6 +21,7 @@ class ContextService {
     build(socketId, options = {}) {
         const {
             emotion = "neutral",
+            emotionState = null,
             userMessage = "",
             userProfile = {},
             desktopState = {},
@@ -45,6 +46,7 @@ class ContextService {
             history,
             memory: retrievedMemory,
             emotion,
+            emotionState,
             currentTime: new Date(),
             userMessage,
             userProfile,

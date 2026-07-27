@@ -16,10 +16,11 @@ const { ConversationService } = require("./services/conversationService");
 const { MemoryService } = require("./services/memoryService");
 const { ContextService } = require("./services/contextService");
 const { EmotionService } = require("./services/emotionService");
+const EmotionEngine = require("./services/EmotionEngine");
 const { TTSService } = require("./services/ttsService");
 const streamService = require("./services/streamService");
 const { PromptBuilder } = require("./services/promptBuilder");
-const AIOrchestrator = require("./services/AIOrchestrator");
+const { AIOrchestrator } = require("./services/AIOrchestrator");
 
 // Setup bindings in Kernel
 function registerBindings() {
@@ -43,7 +44,9 @@ function registerBindings() {
     Kernel.register("conversationService", ConversationService);
     Kernel.register("memoryService", MemoryService);
     Kernel.register("contextService", ContextService);
-    Kernel.register("emotionService", EmotionService);
+    // EmotionEngine registered first (singleton, no Kernel dep)
+    Kernel.register("emotionEngine", EmotionEngine);
+    Kernel.register("emotionService", new EmotionService(Kernel));
     Kernel.register("ttsService", TTSService);
     
     // Require and bind voiceService after ttsService is registered
@@ -62,8 +65,8 @@ function registerBindings() {
     Kernel.register("taskPlanner", TaskPlanner);
     Kernel.register("toolRouter", ToolRouter);
 
-    // AI Orchestrator
-    Kernel.register("aiOrchestrator", AIOrchestrator);
+    // AI Orchestrator (class instance with Kernel DI)
+    Kernel.register("aiOrchestrator", new AIOrchestrator(Kernel));
 }
 
 async function bootstrap() {

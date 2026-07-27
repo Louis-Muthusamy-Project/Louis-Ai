@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 import SocketService from "../services/socketService";
 import CharacterStateMachine from "../core/CharacterStateMachine";
+import EmotionEngine from "../core/EmotionEngine";
 import useChatStore from "../store/chatStore";
 
 export default function ChatProvider({ children }) {
@@ -13,6 +14,9 @@ export default function ChatProvider({ children }) {
         CharacterStateMachine.idle();
 
         SocketService.connect();
+
+        // Initialize cognitive emotion engine (subscribes to yuna:emotion:update)
+        EmotionEngine.init();
 
         const onConnect = () => {
 

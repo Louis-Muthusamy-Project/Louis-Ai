@@ -71,6 +71,8 @@ const SocketEvents = Object.freeze({
 
     CHARACTER_EMOTION: "yuna:character:emotion",
 
+    EMOTION_UPDATE: "yuna:emotion:update",
+
     /**
      * Memory
      */

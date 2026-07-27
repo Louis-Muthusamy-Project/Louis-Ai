@@ -46,6 +46,11 @@ async function handleChatMessage(socket, payload = {}) {
             eventBus.publish("chat:reply", { socketId: socket.id, result });
         }
         socket.emit(Events.MESSAGE_REPLY, result);
+
+        // Emit full cognitive emotion state for Live2D/UI integration
+        if (result && result.emotionState) {
+            socket.emit(Events.EMOTION_UPDATE, result.emotionState);
+        }
     } catch (error) {
         console.error(error);
         // Ensure thinking end is emitted on error

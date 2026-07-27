@@ -12,14 +12,13 @@ class AIOrchestrator {
         this.providerManager = kernel.get("providerManager");
         this.promptBuilder = kernel.get("promptBuilder");
         this.emotionService = kernel.get("emotionService");
+        this.emotionEngine = kernel.get("emotionEngine");
         this.memoryService = kernel.get("memoryService");
         this.contextService = kernel.get("contextService");
         this.voiceService = kernel.get("voiceService");
         this.conversationService = kernel.get("conversationService");
         this.streamService = kernel.get("streamService");
         this.stateMachine = kernel.get("stateMachine");
-        
-        // Lazy-loaded or injected upgraded components
         this.intentDetector = kernel.get("intentDetector");
         this.taskPlanner = kernel.get("taskPlanner");
         this.toolRouter = kernel.get("toolRouter");
@@ -50,8 +49,10 @@ class AIOrchestrator {
             // 5. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
+            const preReplyEmotionState = this.emotionEngine.analyzeText(socketId, userMessage, intentResult.intent);
             const context = this.contextService.build(socketId, {
                 emotion: currentEmotion,
+                emotionState: preReplyEmotionState.toSummary(),
                 userMessage,
                 toolResults,
                 intent: intentResult.intent,
@@ -84,8 +85,9 @@ class AIOrchestrator {
             this.conversationService.addAssistantMessage(socketId, reply);
             this.memoryService.addShortMemory(socketId, "assistant", reply);
 
-            // 9. Emotion detection & State update
-            const emotion = this.emotionService.detect(reply);
+            // 9. Cognitive Emotion Analysis (text + intent → full state update)
+            const emotionState = this.emotionEngine.analyzeText(socketId, reply, intentResult.intent);
+            const emotion = emotionState.toPrimaryEmotion();
             if (this.stateMachine) {
                 this.stateMachine.setEmotion(emotion);
             }
@@ -101,6 +103,7 @@ class AIOrchestrator {
                 success: true,
                 text: reply,
                 emotion,
+                emotionState: emotionState.toSummary(),
                 animation: this.emotionService.getAnimation(emotion),
                 voiceTone: this.emotionService.getVoiceTone(emotion),
                 createdAt: new Date().toISOString()
@@ -188,8 +191,9 @@ class AIOrchestrator {
                         this.conversationService.addAssistantMessage(socketId, text);
                         this.memoryService.addShortMemory(socketId, "assistant", text);
 
-                        // Emotion detection & State update
-                        const emotion = this.emotionService.detect(text);
+                        // Cognitive Emotion Analysis
+                        const emotionState = this.emotionEngine.analyzeText(socketId, text, intentResult.intent);
+                        const emotion = emotionState.toPrimaryEmotion();
                         if (this.stateMachine) {
                             this.stateMachine.setEmotion(emotion);
                         }
@@ -206,6 +210,7 @@ class AIOrchestrator {
                                 success: true,
                                 text,
                                 emotion,
+                                emotionState: emotionState.toSummary(),
                                 animation: this.emotionService.getAnimation(emotion),
                                 voiceTone: this.emotionService.getVoiceTone(emotion),
                                 createdAt: new Date().toISOString()
@@ -221,11 +226,13 @@ class AIOrchestrator {
                 delay: 1000
             });
 
-            const finalEmotion = this.emotionService.detect(streamResultText);
+            const finalState = this.emotionEngine.getState(socketId);
+            const finalEmotion = finalState.toPrimaryEmotion();
             return {
                 success: true,
                 text: streamResultText,
                 emotion: finalEmotion,
+                emotionState: finalState.toSummary(),
                 animation: this.emotionService.getAnimation(finalEmotion),
                 voiceTone: this.emotionService.getVoiceTone(finalEmotion),
                 createdAt: new Date().toISOString()
@@ -252,4 +259,4 @@ class AIOrchestrator {
     }
 }
 
-module.exports = AIOrchestrator;
+module.exports = { AIOrchestrator };
