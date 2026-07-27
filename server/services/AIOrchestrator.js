@@ -22,6 +22,7 @@ class AIOrchestrator {
         this.intentDetector = kernel.get("intentDetector");
         this.taskPlanner = kernel.get("taskPlanner");
         this.toolRouter = kernel.get("toolRouter");
+        this.personalityEngine = kernel.get("personalityEngine");
     }
 
     async generateReply(socketId, userMessage) {
@@ -50,9 +51,11 @@ class AIOrchestrator {
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
             const preReplyEmotionState = this.emotionEngine.analyzeText(socketId, userMessage, intentResult.intent);
+            const personalityState = await this.personalityEngine.adapt(socketId, userMessage, preReplyEmotionState);
             const context = this.contextService.build(socketId, {
                 emotion: currentEmotion,
                 emotionState: preReplyEmotionState.toSummary(),
+                personalityDirectives: personalityState.getDirectives(),
                 userMessage,
                 toolResults,
                 intent: intentResult.intent,
@@ -151,8 +154,12 @@ class AIOrchestrator {
             // 5. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
+            const preReplyEmotionState = this.emotionEngine.analyzeText(socketId, userMessage, intentResult.intent);
+            const personalityState = await this.personalityEngine.adapt(socketId, userMessage, preReplyEmotionState);
             const context = this.contextService.build(socketId, {
                 emotion: currentEmotion,
+                emotionState: preReplyEmotionState.toSummary(),
+                personalityDirectives: personalityState.getDirectives(),
                 userMessage,
                 toolResults,
                 intent: intentResult.intent,

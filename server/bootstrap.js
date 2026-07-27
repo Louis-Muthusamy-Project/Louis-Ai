@@ -17,6 +17,7 @@ const { MemoryService } = require("./services/memoryService");
 const { ContextService } = require("./services/contextService");
 const { EmotionService } = require("./services/emotionService");
 const EmotionEngine = require("./services/EmotionEngine");
+const PersonalityEngine = require("./services/PersonalityEngine");
 const { TTSService } = require("./services/ttsService");
 const streamService = require("./services/streamService");
 const { PromptBuilder } = require("./services/promptBuilder");
@@ -47,6 +48,7 @@ function registerBindings() {
     // EmotionEngine registered first (singleton, no Kernel dep)
     Kernel.register("emotionEngine", EmotionEngine);
     Kernel.register("emotionService", new EmotionService(Kernel));
+    Kernel.register("personalityEngine", new PersonalityEngine(Kernel));
     Kernel.register("ttsService", TTSService);
     
     // Require and bind voiceService after ttsService is registered

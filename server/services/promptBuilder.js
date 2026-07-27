@@ -25,7 +25,8 @@ class PromptBuilder {
             relationship = {},
             timeline = [],
             goals = [],
-            projects = []
+            projects = [],
+            personalityDirectives = ""
         } = options;
 
         let prompt = "";
@@ -114,6 +115,9 @@ class PromptBuilder {
 
         prompt += `User: ${userMessage}\n\n`;
         prompt += "Response Guidelines:\n";
+        if (personalityDirectives) {
+            prompt += `${personalityDirectives}\n`;
+        }
         prompt += "1. Incorporate User Profile details, Goals, Projects, and Long-term Memories naturally in character.\n";
         prompt += "2. Reference the Tool Execution Results naturally if relevant to the User's query.\n";
         prompt += "3. Align voice tone and dialogue complexity to matches the Relationship Level.\n\n";

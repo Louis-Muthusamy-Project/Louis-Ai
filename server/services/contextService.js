@@ -22,6 +22,7 @@ class ContextService {
         const {
             emotion = "neutral",
             emotionState = null,
+            personalityDirectives = "",
             userMessage = "",
             userProfile = {},
             desktopState = {},
@@ -47,6 +48,7 @@ class ContextService {
             memory: retrievedMemory,
             emotion,
             emotionState,
+            personalityDirectives,
             currentTime: new Date(),
             userMessage,
             userProfile,
