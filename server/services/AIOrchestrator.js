@@ -20,8 +20,7 @@ class AIOrchestrator {
         this.streamService = kernel.get("streamService");
         this.stateMachine = kernel.get("stateMachine");
         this.intentDetector = kernel.get("intentDetector");
-        this.taskPlanner = kernel.get("taskPlanner");
-        this.toolRouter = kernel.get("toolRouter");
+        this.agentCoordinator = kernel.get("agentCoordinator");
         this.personalityEngine = kernel.get("personalityEngine");
     }
 
@@ -43,9 +42,12 @@ class AIOrchestrator {
             // 3. Run Intent Detection
             const intentResult = await this.intentDetector.detect(userMessage);
 
-            // 4. Run Task Planning & Tool Routing
-            const plan = this.taskPlanner.plan(intentResult);
-            const toolResults = await this.toolRouter.route(plan);
+            // 4. Run Task Planning & Execution via Agents
+            let toolResults = [];
+            if (intentResult.intent === "USE_TOOL") {
+                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage);
+                toolResults = [{ result: coordinatorResponse }];
+            }
 
             // 5. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
@@ -148,9 +150,12 @@ class AIOrchestrator {
             // 3. Run Intent Detection
             const intentResult = await this.intentDetector.detect(userMessage);
 
-            // 4. Run Task Planning & Tool Routing
-            const plan = this.taskPlanner.plan(intentResult);
-            const toolResults = await this.toolRouter.route(plan);
+            // 4. Run Task Planning & Execution via Agents
+            let toolResults = [];
+            if (intentResult.intent === "USE_TOOL") {
+                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage);
+                toolResults = [{ result: coordinatorResponse }];
+            }
 
             // 5. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);

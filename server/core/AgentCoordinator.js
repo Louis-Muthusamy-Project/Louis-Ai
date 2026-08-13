@@ -3,14 +3,25 @@ const BaseAgent = require("./BaseAgent");
 /**
  * AgentCoordinator - The central dispatcher for the Multi-Agent Architecture.
  * Receives user input and orchestrates the flow between Planner, Executor, and other agents.
+ * Extends BaseAgent to leverage the EventBus and SharedContext.
+ * 
+ * @class AgentCoordinator
+ * @extends BaseAgent
  */
 class AgentCoordinator extends BaseAgent {
+    /**
+     * @param {Object} kernel - The Dependency Injection container.
+     */
     constructor(kernel) {
         super("Coordinator", kernel);
         // Track active tasks
         this.activeTasks = new Map(); 
     }
 
+    /**
+     * Bootstraps the Coordinator by listening to task complete/error events.
+     * @async
+     */
     async start() {
         super.start();
 
@@ -41,6 +52,11 @@ class AgentCoordinator extends BaseAgent {
      * 1. Ask Planner Agent to create a plan.
      * 2. Execute plan steps by broadcasting to specialized agents.
      * 3. Return final result.
+     * 
+     * @async
+     * @param {string} socketId - The originating user's socket session.
+     * @param {string} text - The user's input text.
+     * @returns {Promise<string>} The synthesized response text.
      */
     async handleUserMessage(socketId, text) {
         console.log(`[Agent:Coordinator] Handling message: "${text}"`);
@@ -72,6 +88,12 @@ class AgentCoordinator extends BaseAgent {
 
     /**
      * Delegates a specific task to an agent and waits for completion over the EventBus.
+     * Utilizes the SharedContext to track promise callbacks.
+     * 
+     * @param {string} agentName - Target agent's name (e.g. 'Browser')
+     * @param {string} action - The action identifier (e.g. 'search')
+     * @param {Object} params - The payload dictionary
+     * @returns {Promise<Object>} The completed result payload from the agent.
      */
     delegateTask(agentName, action, params) {
         return new Promise((resolve, reject) => {

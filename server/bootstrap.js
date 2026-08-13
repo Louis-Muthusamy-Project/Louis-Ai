@@ -65,11 +65,9 @@ function registerBindings() {
     // New AI Core components (lazy loaded by AIOrchestrator)
     const IntentDetector = require("./services/intentDetector");
     const TaskPlanner = require("./services/taskPlanner");
-    const ToolRouter = require("./services/toolRouter");
     
     Kernel.register("intentDetector", IntentDetector);
     Kernel.register("taskPlanner", TaskPlanner);
-    Kernel.register("toolRouter", ToolRouter);
 
     // Multi-Agent Architecture Core
     const SharedContext = require("./core/SharedContext");

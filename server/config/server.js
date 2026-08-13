@@ -1,6 +1,8 @@
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
+const helmet = require("helmet");
+const rateLimit = require("express-rate-limit");
 const settingsRoutes = require("../routes/settingsRoutes");
 
 function createApp() {
@@ -8,10 +10,17 @@ function createApp() {
   const app = express();
 
   /**
-   * Security
+   * Security & Rate Limiting
    */
-
+  app.use(helmet());
   app.disable("x-powered-by");
+
+  const limiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 100, // limit each IP to 100 requests per windowMs
+    message: "Too many requests from this IP, please try again later."
+  });
+  app.use(limiter);
 
   /**
    * CORS
