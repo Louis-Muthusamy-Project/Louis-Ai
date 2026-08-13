@@ -9,10 +9,15 @@
     "goals": [],
     "projects": [],
     "relationship": {
-        "level": 1,
-        "points": 8,
-        "lastInteraction": "2026-08-13T06:40:30.018Z",
-        "interactionCount": 8
+        "level": 2,
+        "points": 16,
+        "lastInteraction": "2026-08-13T13:10:59.064Z",
+        "interactionCount": 16
     },
-    "timeline": []
+    "timeline": [
+        {
+            "event": "Leveled up relationship with Yuna to Level 2!",
+            "timestamp": "2026-08-13T13:02:14.527Z"
+        }
+    ]
 }

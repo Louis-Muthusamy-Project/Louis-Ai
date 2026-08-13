@@ -30,6 +30,8 @@ function registerBindings() {
     Kernel.register("moduleRegistry", ModuleRegistry);
     Kernel.register("capabilityRegistry", CapabilityRegistry);
     Kernel.register("pluginLoader", PluginLoader);
+    const PluginManager = require("./core/PluginManager");
+    Kernel.register("pluginManager", new PluginManager(Kernel));
     Kernel.register("stateMachine", StateMachine);
 
     // Infrastructure
@@ -57,6 +59,8 @@ function registerBindings() {
     
     Kernel.register("streamService", streamService);
     Kernel.register("promptBuilder", PromptBuilder);
+    const ScheduleService = require("./services/scheduleService");
+    Kernel.register("scheduleService", new ScheduleService(Kernel));
     
     // New AI Core components (lazy loaded by AIOrchestrator)
     const IntentDetector = require("./services/intentDetector");
@@ -67,7 +71,38 @@ function registerBindings() {
     Kernel.register("taskPlanner", TaskPlanner);
     Kernel.register("toolRouter", ToolRouter);
 
-    // AI Orchestrator (class instance with Kernel DI)
+    // Multi-Agent Architecture Core
+    const SharedContext = require("./core/SharedContext");
+    const AgentCoordinator = require("./core/AgentCoordinator");
+    
+    Kernel.register("sharedContext", new SharedContext());
+    const coordinator = new AgentCoordinator(Kernel);
+    Kernel.register("agentCoordinator", coordinator);
+
+    // Agents
+    const PlannerAgent = require("./agents/PlannerAgent");
+    const ExecutorAgent = require("./agents/ExecutorAgent");
+    const MemoryAgent = require("./agents/MemoryAgent");
+    const VisionAgent = require("./agents/VisionAgent");
+    const VoiceAgent = require("./agents/VoiceAgent");
+    const CodingAgent = require("./agents/CodingAgent");
+    const BrowserAgent = require("./agents/BrowserAgent");
+    const AutomationAgent = require("./agents/AutomationAgent");
+    const LearningAgent = require("./agents/LearningAgent");
+
+    Kernel.register("agents", [
+        new PlannerAgent(Kernel),
+        new ExecutorAgent(Kernel),
+        new MemoryAgent(Kernel),
+        new VisionAgent(Kernel),
+        new VoiceAgent(Kernel),
+        new CodingAgent(Kernel),
+        new BrowserAgent(Kernel),
+        new AutomationAgent(Kernel),
+        new LearningAgent(Kernel)
+    ]);
+
+    // AI Orchestrator (Legacy/Bridge wrapper if needed)
     Kernel.register("aiOrchestrator", new AIOrchestrator(Kernel));
 }
 
@@ -77,7 +112,7 @@ async function bootstrap() {
     // Bind all dependencies
     registerBindings();
 
-    // Eagerly resolve and load plugins (tools, capabilities)
+    // Eagerly resolve and load basic tools/capabilities
     const pluginLoader = Kernel.get("pluginLoader");
     const capabilityRegistry = Kernel.get("capabilityRegistry");
     const ToolManager = require("./tools"); // Legacy or active ToolManager instance
@@ -85,9 +120,22 @@ async function bootstrap() {
     await pluginLoader.loadTools(ToolManager);
     await pluginLoader.loadCapabilities(capabilityRegistry);
 
+    // Initialize Advanced Plugin System
+    const pluginManager = Kernel.get("pluginManager");
+    await pluginManager.initialize();
+
     // Run initialization lifecycle
+    await Kernel.get("scheduleService").initialize();
     await capabilityRegistry.initializeAll(Kernel);
     await ModuleRegistry.initializeAll(Kernel);
+
+    // Start Multi-Agent System
+    const coordinator = Kernel.get("agentCoordinator");
+    await coordinator.start();
+    const agents = Kernel.get("agents");
+    for (const agent of agents) {
+        await agent.start();
+    }
 
     console.log("Capabilities Loaded:");
     console.log(capabilityRegistry.list().map(c => c.name));

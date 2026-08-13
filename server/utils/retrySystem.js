@@ -17,12 +17,19 @@ class RetrySystem {
             maxAttempts = 3,
             delay = 1000,
             factor = 2,
+            timeoutMs = 0,
             onRetry = null
         } = options;
 
         let attempt = 0;
         while (attempt < maxAttempts) {
             try {
+                if (timeoutMs > 0) {
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+                    });
+                    return await Promise.race([asyncFn(), timeoutPromise]);
+                }
                 return await asyncFn();
             } catch (error) {
                 attempt++;

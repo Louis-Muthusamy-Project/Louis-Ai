@@ -16,8 +16,11 @@ class GeminiProvider extends BaseAIProvider {
             throw new Error("GEMINI_API_KEY is missing.");
         }
 
+        const timeoutMs = geminiConfig.timeout || 30000;
+
         this.client = new GoogleGenAI({
-            apiKey: process.env.GEMINI_API_KEY
+            apiKey: process.env.GEMINI_API_KEY,
+            httpOptions: { timeout: timeoutMs }
         });
 
         this.model = geminiConfig.model;

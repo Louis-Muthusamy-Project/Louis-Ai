@@ -81,7 +81,8 @@ class AIOrchestrator {
                 return await this.providerManager.generate(contents);
             }, {
                 maxAttempts: 3,
-                delay: 1000
+                delay: 1000,
+                timeoutMs: 30000
             });
 
             // 8. Log Assistant response
@@ -230,7 +231,8 @@ class AIOrchestrator {
                 });
             }, {
                 maxAttempts: 3,
-                delay: 1000
+                delay: 1000,
+                timeoutMs: 30000
             });
 
             const finalState = this.emotionEngine.getState(socketId);

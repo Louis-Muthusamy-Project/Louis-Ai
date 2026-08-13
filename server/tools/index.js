@@ -10,6 +10,18 @@ ToolManager.register(
     require("./system/CalculatorTool")
 );
 
+ToolManager.register(
+    require("./system/BrowserTool")
+);
+
+ToolManager.register(
+    require("./system/CodingTool")
+);
+
+ToolManager.register(
+    require("./system/ScheduleTool")
+);
+
 ToolManager.register(require("./os/ClipboardTool"));
 ToolManager.register(require("./os/NotificationTool"));
 ToolManager.register(require("./os/FileManagementTool"));

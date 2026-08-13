@@ -2,6 +2,19 @@ const { handleChatMessage } = require("../controllers/chatController");
 const Events = require("./socketEvents");
 
 function registerSocketHandlers(io) {
+    const Kernel = require("../core/Kernel");
+    const eventBus = Kernel.get("eventBus");
+
+    // Listen for proactive notifications (like Scheduler)
+    eventBus.on("scheduler:trigger", (data) => {
+        io.emit(Events.MESSAGE_REPLY, {
+            id: data.taskId,
+            role: "yuna",
+            content: `⏰ **Reminder Triggered!**\n\n${data.message}`,
+            timestamp: new Date().toISOString()
+        });
+    });
+
     io.on("connection", (socket) => {
         console.log("=================================");
         console.log("🟢 New Client Connected");
