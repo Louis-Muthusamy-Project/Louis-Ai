@@ -57,6 +57,17 @@ function registerSocketHandlers(io) {
 
         );
 
+        socket.on('VISION_PROCESS', async (payload) => {
+            try {
+                const visionService = require('../services/visionService');
+                const memory = await visionService.processImage(payload.image, payload.source);
+                socket.emit('VISION_RESULT', memory);
+            } catch (error) {
+                console.error("Vision process error:", error);
+                socket.emit(Events.MESSAGE_ERROR, { message: "Vision processing failed." });
+            }
+        });
+
         socket.on("disconnect", (reason) => {
             console.log("=================================");
             console.log("🔴 Client Disconnected");

@@ -9,8 +9,10 @@
     "goals": [],
     "projects": [],
     "relationship": {
-        "level": 7,
-        "points": 0
+        "level": 1,
+        "points": 8,
+        "lastInteraction": "2026-08-13T06:40:30.018Z",
+        "interactionCount": 8
     },
     "timeline": []
 }

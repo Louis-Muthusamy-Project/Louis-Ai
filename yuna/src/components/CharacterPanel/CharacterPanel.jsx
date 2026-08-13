@@ -1,127 +1,136 @@
 import React from "react";
 import { motion } from "framer-motion";
 import Live2DCanvas from "../../live2d/Live2DCanvas";
-
 import styles from "./characterPanel.module.css";
 import useCharacterState from "../../hooks/useCharacterState";
 import useEmotionState from "../../hooks/useEmotionState";
 import useVoice from "../../hooks/useVoice";
 
 export default function CharacterPanel() {
-  const { speaking } = useVoice();
+    const { speaking } = useVoice();
+    const { isThinking, isTalking } = useCharacterState();
 
-  const {
-    isIdle,
-    isListening,
-    isThinking,
-    isTalking,
-  } = useCharacterState();
+    // Full 9-axis cognitive emotion state
+    const {
+        energy = 0.5,
+        joy = 0.5,
+        primary = "neutral",
+        animProps = {},
+    } = useEmotionState();
 
-  // Full cognitive emotion state — drives continuous animation
-  const {
-    energy,
-    joy,
-    stress,
-    curiosity,
-    primary,
-    animProps,
-  } = useEmotionState();
+    // Dynamic glow opacity & scale from emotion axes
+    const glowOpacity = animProps.glowOpacity || (0.2 + joy * 0.4 + energy * 0.2);
+    const breathOpacity = isTalking || speaking
+        ? Math.min(0.45, 0.2 + energy * 0.25)
+        : Math.min(0.25, 0.1 + energy * 0.15);
 
-  // ── Derive continuous animation parameters from emotion axes ──────────────
+    // Primary emotion label mapping
+    const emotionLabels = {
+        happy: "✨ Happy",
+        excited: "⚡ Excited",
+        curious: "🔍 Curious",
+        thinking: "💭 Thinking",
+        sad: "🌧️ Melancholic",
+        anxious: "💫 Nervous",
+        angry: "🔥 Fired Up",
+        shy: "🌸 Flustered",
+        surprised: "❗ Surprised",
+        neutral: "🍃 Calm",
+    };
 
-  // Character scale: excited/talking → slightly bigger
-  const characterScale = isTalking || speaking
-    ? animProps.characterScale + 0.01
-    : isThinking
-      ? 1.02
-      : isListening
-        ? 1.01
-        : animProps.characterScale;
+    const currentLabel = isThinking
+        ? "💭 Thinking..."
+        : isTalking || speaking
+        ? "🎙️ Speaking"
+        : emotionLabels[primary] || "🍃 Calm";
 
-  // Vertical bob: idle + joy drives it
-  const yAnimation = isIdle
-    ? [0, -(animProps.bobAmplitude), 0]
-    : 0;
+    return (
+        <div className={styles.wrap}>
+            <div className={styles.cityBg} />
 
-  // Rotation: happy/excited wiggle; stress twitch is smaller
-  const rotateAnimation = primary === "excited"
-    ? [0, animProps.rotateAmplitude, -animProps.rotateAmplitude, 0]
-    : joy > 0.65
-      ? [0, animProps.rotateAmplitude, -animProps.rotateAmplitude, 0]
-      : stress > 0.55
-        ? [0, 0.8, -0.8, 0]
-        : 0;
+            <div className={styles.characterWrap}>
+                {/* Background ambient glow ring */}
+                <motion.div
+                    className={styles.orbGlow}
+                    animate={{
+                        opacity: glowOpacity,
+                        scale: [0.95, 1.05, 0.95],
+                    }}
+                    transition={{
+                        duration: 3.5,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                    }}
+                />
 
-  // Breath ring opacity and scale driven by energy + speaking
-  const breathOpacity = isTalking || speaking
-    ? Math.min(0.6, 0.3 + energy * 0.3)
-    : Math.min(0.35, 0.15 + energy * 0.2);
+                {/* Subtle breath ring aura */}
+                <motion.div
+                    className={styles.breath}
+                    animate={{
+                        opacity: breathOpacity,
+                        scale: [0.97, 1.03, 0.97],
+                    }}
+                    transition={{
+                        duration: 4.2,
+                        repeat: Infinity,
+                        ease: "easeInOut",
+                    }}
+                />
 
-  const breathScale = isTalking || speaking
-    ? animProps.breathScale + 0.1
-    : animProps.breathScale;
+                {/* Upgraded Live2D Canvas with 13 subsystems */}
+                <Live2DCanvas />
+            </div>
 
-  // Glow intensity driven by energy + joy
-  const glowOpacity = animProps.glowOpacity;
+            {/* Futuristic floating emotion indicator */}
+            <div
+                style={{
+                    position: "absolute",
+                    top: "18px",
+                    left: "18px",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "8px",
+                    padding: "6px 14px",
+                    borderRadius: "999px",
+                    background: "rgba(18, 10, 36, 0.65)",
+                    border: "1px solid rgba(168, 85, 247, 0.25)",
+                    backdropFilter: "blur(12px)",
+                    boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                    fontSize: "12px",
+                    fontWeight: "500",
+                    color: "rgba(230, 220, 255, 0.9)",
+                    letterSpacing: "0.02em",
+                    pointerEvents: "none",
+                    zIndex: 10,
+                }}
+            >
+                <div
+                    style={{
+                        width: "8px",
+                        height: "8px",
+                        borderRadius: "50%",
+                        background: isThinking
+                            ? "#a855f7"
+                            : isTalking || speaking
+                            ? "#3b82f6"
+                            : "#10b981",
+                        boxShadow: `0 0 10px ${
+                            isThinking
+                                ? "#a855f7"
+                                : isTalking || speaking
+                                ? "#3b82f6"
+                                : "#10b981"
+                        }`,
+                    }}
+                />
+                <span>{currentLabel}</span>
+            </div>
 
-  // Animation duration: excited = faster, calm = slower
-  const animDuration = primary === "excited" ? 1.2
-    : primary === "anxious" ? 1.5
-    : energy > 0.7 ? 1.8
-    : 2.5;
-
-  const shouldRepeat = isIdle || joy > 0.55 || primary === "excited";
-
-  return (
-    <div className={styles.wrap}>
-
-      <div className={styles.cityBg} />
-
-      <motion.div
-        className={styles.characterWrap}
-        animate={{
-          scale: characterScale,
-          y: yAnimation,
-          rotate: rotateAnimation,
-        }}
-        transition={{
-          duration: animDuration,
-          repeat: shouldRepeat ? Infinity : 0,
-          ease: "easeInOut"
-        }}
-      >
-
-        {/* Glow ring — intensity driven by energy + joy */}
-        <motion.div
-          className={styles.orbGlow}
-          animate={{ opacity: glowOpacity }}
-          transition={{ duration: 1.5, repeat: Infinity, repeatType: "reverse" }}
-        />
-
-        <Live2DCanvas />
-
-        {/* Breath ring — driven by energy and speaking state */}
-        <motion.div
-          className={styles.breath}
-          animate={{
-            opacity: breathOpacity,
-            scale: breathScale,
-          }}
-          transition={{
-            repeat: Infinity,
-            duration: animDuration * 0.9,
-            ease: "easeInOut"
-          }}
-        />
-
-      </motion.div>
-
-      <div className={styles.idleHints}>
-        <div className={styles.hintLine} />
-        <div className={styles.hintLine} />
-        <div className={styles.hintLine} />
-      </div>
-
-    </div>
-  );
+            <div className={styles.idleHints}>
+                <div className={styles.hintLine} />
+                <div className={styles.hintLine} />
+                <div className={styles.hintLine} />
+            </div>
+        </div>
+    );
 }

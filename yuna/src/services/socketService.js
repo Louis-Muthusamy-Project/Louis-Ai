@@ -31,17 +31,10 @@ class SocketService {
             "http://localhost:3000";
 
         this.socket = io(url, {
-
-            transports: ["websocket"],
-
             autoConnect: true,
-
             reconnection: true,
-
             reconnectionAttempts: Infinity,
-
             reconnectionDelay: 1000
-
         });
 
         this.socket.onAny((event, data) => {

@@ -7,9 +7,14 @@ ToolManager.register(
 );
 
 ToolManager.register(
-
     require("./system/CalculatorTool")
-
 );
+
+ToolManager.register(require("./os/ClipboardTool"));
+ToolManager.register(require("./os/NotificationTool"));
+ToolManager.register(require("./os/FileManagementTool"));
+ToolManager.register(require("./os/SystemControlTool"));
+ToolManager.register(require("./os/SystemMonitorTool"));
+ToolManager.register(require("./os/AppLauncherTool"));
 
 module.exports = ToolManager;
