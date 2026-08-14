@@ -11,9 +11,16 @@ class AutomationAgent extends BaseAgent {
         this.listen('agent:Automation:request', async (payload) => {
             const { taskId, action, params } = payload;
             try {
-                // TODO: Wire up actual capability/service here
-                console.log(`[${this.name}] Executing ${action}`);
-                this.broadcast('agent:task:complete', { taskId, result: { success: true, message: `${this.name} finished ${action}` } });
+                const capability = this.kernel.get("capabilityRegistry").get(action);
+                if (!capability) {
+                    throw new Error(`Capability ${action} is not registered.`);
+                }
+                if (typeof capability.execute === "function") {
+                    const result = await capability.execute(params);
+                    this.broadcast('agent:task:complete', { taskId, result });
+                } else {
+                    throw new Error(`Capability ${action} missing execute method.`);
+                }
             } catch (error) {
                 this.broadcast('agent:task:error', { taskId, error: error.message });
             }

@@ -11,7 +11,6 @@ class AIOrchestrator {
         this.kernel = kernel;
         this.providerManager = kernel.get("providerManager");
         this.promptBuilder = kernel.get("promptBuilder");
-        this.emotionService = kernel.get("emotionService");
         this.emotionEngine = kernel.get("emotionEngine");
         this.memoryService = kernel.get("memoryService");
         this.contextService = kernel.get("contextService");
@@ -42,14 +41,7 @@ class AIOrchestrator {
             // 3. Run Intent Detection
             const intentResult = await this.intentDetector.detect(userMessage);
 
-            // 4. Run Task Planning & Execution via Agents
-            let toolResults = [];
-            if (intentResult.intent === "USE_TOOL") {
-                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage);
-                toolResults = [{ result: coordinatorResponse }];
-            }
-
-            // 5. Context Building
+            // 4. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
             const preReplyEmotionState = this.emotionEngine.analyzeText(socketId, userMessage, intentResult.intent);
@@ -59,7 +51,7 @@ class AIOrchestrator {
                 emotionState: preReplyEmotionState.toSummary(),
                 personalityDirectives: personalityState.getDirectives(),
                 userMessage,
-                toolResults,
+                toolResults: [],
                 intent: intentResult.intent,
                 userProfile: cognitiveMemory.userProfile,
                 memory: cognitiveMemory.relevantMemories,
@@ -68,6 +60,22 @@ class AIOrchestrator {
                 goals: cognitiveMemory.goals,
                 projects: cognitiveMemory.projects
             });
+
+            // 5. Run Task Planning & Execution via Agents
+            let toolResults = [];
+            if (intentResult.requiresTool) {
+                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage, context, intentResult);
+                
+                // Response Processor: Gracefully format the execution results
+                if (coordinatorResponse.type === "partial_failure") {
+                    toolResults = [{ result: `Task partially failed. Completed: ${coordinatorResponse.completedSteps.length} steps. Failed on: ${coordinatorResponse.failedStep.capability} with error: ${coordinatorResponse.failedStep.error}` }];
+                } else if (coordinatorResponse.type === "success") {
+                    toolResults = [{ result: coordinatorResponse.message }];
+                }
+                
+                // Re-inject the tool results into the context for prompt building
+                context.toolResults = toolResults;
+            }
 
             // 6. Compile Prompt using Prompt Builder v2
             const prompt = this.promptBuilder.build(context);
@@ -110,8 +118,8 @@ class AIOrchestrator {
                 text: reply,
                 emotion,
                 emotionState: emotionState.toSummary(),
-                animation: this.emotionService.getAnimation(emotion),
-                voiceTone: this.emotionService.getVoiceTone(emotion),
+                animation: this.emotionEngine.getAnimation(emotion),
+                voiceTone: this.emotionEngine.getVoiceTone(emotion),
                 createdAt: new Date().toISOString()
             };
 
@@ -150,14 +158,7 @@ class AIOrchestrator {
             // 3. Run Intent Detection
             const intentResult = await this.intentDetector.detect(userMessage);
 
-            // 4. Run Task Planning & Execution via Agents
-            let toolResults = [];
-            if (intentResult.intent === "USE_TOOL") {
-                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage);
-                toolResults = [{ result: coordinatorResponse }];
-            }
-
-            // 5. Context Building
+            // 4. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
             const currentEmotion = this.stateMachine ? this.stateMachine.currentEmotion : "neutral";
             const preReplyEmotionState = this.emotionEngine.analyzeText(socketId, userMessage, intentResult.intent);
@@ -167,7 +168,7 @@ class AIOrchestrator {
                 emotionState: preReplyEmotionState.toSummary(),
                 personalityDirectives: personalityState.getDirectives(),
                 userMessage,
-                toolResults,
+                toolResults: [],
                 intent: intentResult.intent,
                 userProfile: cognitiveMemory.userProfile,
                 memory: cognitiveMemory.relevantMemories,
@@ -176,6 +177,20 @@ class AIOrchestrator {
                 goals: cognitiveMemory.goals,
                 projects: cognitiveMemory.projects
             });
+
+            // 5. Run Task Planning & Execution via Agents
+            let toolResults = [];
+            if (intentResult.requiresTool) {
+                const coordinatorResponse = await this.agentCoordinator.handleUserMessage(socketId, userMessage, context, intentResult);
+                
+                if (coordinatorResponse.type === "partial_failure") {
+                    toolResults = [{ result: `Task partially failed. Completed: ${coordinatorResponse.completedSteps.length} steps. Failed on: ${coordinatorResponse.failedStep.capability} with error: ${coordinatorResponse.failedStep.error}` }];
+                } else if (coordinatorResponse.type === "success") {
+                    toolResults = [{ result: coordinatorResponse.message }];
+                }
+                
+                context.toolResults = toolResults;
+            }
 
             // 6. Compile Prompt using Prompt Builder v2
             const prompt = this.promptBuilder.build(context);
@@ -224,8 +239,8 @@ class AIOrchestrator {
                                 text,
                                 emotion,
                                 emotionState: emotionState.toSummary(),
-                                animation: this.emotionService.getAnimation(emotion),
-                                voiceTone: this.emotionService.getVoiceTone(emotion),
+                                animation: this.emotionEngine.getAnimation(emotion),
+                                voiceTone: this.emotionEngine.getVoiceTone(emotion),
                                 createdAt: new Date().toISOString()
                             });
                         }
@@ -247,8 +262,8 @@ class AIOrchestrator {
                 text: streamResultText,
                 emotion: finalEmotion,
                 emotionState: finalState.toSummary(),
-                animation: this.emotionService.getAnimation(finalEmotion),
-                voiceTone: this.emotionService.getVoiceTone(finalEmotion),
+                animation: this.emotionEngine.getAnimation(finalEmotion),
+                voiceTone: this.emotionEngine.getVoiceTone(finalEmotion),
                 createdAt: new Date().toISOString()
             };
 

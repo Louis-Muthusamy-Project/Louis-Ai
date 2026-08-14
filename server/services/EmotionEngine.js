@@ -225,6 +225,36 @@ class EmotionEngine {
     destroy() {
         clearInterval(this._decayInterval);
     }
+
+    getAnimation(emotion) {
+        const ANIMATION_MAP = {
+            happy:   "smile",
+            excited: "excited",
+            sad:     "sad",
+            angry:   "angry",
+            confused:"thinking",
+            anxious: "thinking",
+            curious: "smile",
+            focused: "idle",
+            neutral: "idle"
+        };
+        return ANIMATION_MAP[emotion] || "idle";
+    }
+
+    getVoiceTone(emotion) {
+        const TONE_MAP = {
+            happy:   "cheerful",
+            excited: "energetic",
+            sad:     "soft",
+            angry:   "firm",
+            confused:"thinking",
+            anxious: "soft",
+            curious: "cheerful",
+            focused: "normal",
+            neutral: "normal"
+        };
+        return TONE_MAP[emotion] || "normal";
+    }
 }
 
 module.exports = new EmotionEngine();

@@ -13,8 +13,8 @@ class MemoryService {
         this.maxShortMemory = 20;
     }
 
-    get fileStore() {
-        return this.kernel.get("memoryFileStore");
+    get repository() {
+        return this.kernel.get("memoryRepository");
     }
 
     get providerManager() {
@@ -59,23 +59,23 @@ class MemoryService {
     }
 
     // Legacy Key-Value mock long-term methods (to support existing requirements)
-    saveLongMemory(userId, key, value) {
-        const profile = this.fileStore.readProfile();
+    async saveLongMemory(userId, key, value) {
+        const profile = await this.repository.readProfile();
         if (!profile.user) profile.user = {};
         profile.user[key] = value;
-        this.fileStore.writeProfile(profile);
+        await this.repository.writeProfile(profile);
     }
 
-    getLongMemory(userId) {
-        const profile = this.fileStore.readProfile();
+    async getLongMemory(userId) {
+        const profile = await this.repository.readProfile();
         return profile.user || {};
     }
 
-    removeLongMemory(userId, key) {
-        const profile = this.fileStore.readProfile();
+    async removeLongMemory(userId, key) {
+        const profile = await this.repository.readProfile();
         if (profile.user) {
             delete profile.user[key];
-            this.fileStore.writeProfile(profile);
+            await this.repository.writeProfile(profile);
         }
     }
 
@@ -111,9 +111,9 @@ class MemoryService {
                 category
             });
 
-            const memories = this.fileStore.readMemories();
+            const memories = await this.repository.readMemories();
             memories.push(item.toJSON());
-            this.fileStore.writeMemories(memories);
+            await this.repository.writeMemories(memories);
             
             // Trigger automatic cleanup after saving
             this.cleanupMemories();
@@ -143,7 +143,7 @@ Memory: "${text}"`;
     async searchSemanticMemory(query, limit = 5, minSimilarity = 0.65) {
         try {
             const queryEmbedding = await this.providerManager.embed(query);
-            const memories = this.fileStore.readMemories();
+            const memories = await this.repository.readMemories();
 
             const scored = memories
                 .map(m => {
@@ -161,24 +161,24 @@ Memory: "${text}"`;
     }
 
     // Profile & Relationship operations
-    getProfile() {
-        return this.fileStore.readProfile();
+    async getProfile() {
+        return await this.repository.readProfile();
     }
 
-    updateProfile(updates) {
-        const profile = this.fileStore.readProfile();
+    async updateProfile(updates) {
+        const profile = await this.repository.readProfile();
         const merged = {
             ...profile,
             ...updates,
             user: { ...profile.user, ...updates.user },
             preferences: { ...profile.preferences, ...updates.preferences }
         };
-        this.fileStore.writeProfile(merged);
+        await this.repository.writeProfile(merged);
         return merged;
     }
 
-    updateRelationship(points) {
-        const profile = this.fileStore.readProfile();
+    async updateRelationship(points) {
+        const profile = await this.repository.readProfile();
         if (!profile.relationship) {
             profile.relationship = { level: 1, points: 0, firstInteraction: new Date().toISOString() };
         }
@@ -199,20 +199,20 @@ Memory: "${text}"`;
             });
         }
 
-        this.fileStore.writeProfile(profile);
+        await this.repository.writeProfile(profile);
         return rel;
     }
 
     // Memory Retrieval Pipeline
     async retrieveContextMemories(socketId, userMessage) {
-        const profile = this.fileStore.readProfile();
+        const profile = await this.repository.readProfile();
         
         // Find relevant long-term memories via semantic vector search
         const semanticResults = await this.searchSemanticMemory(userMessage, 4);
         const relevantMemories = semanticResults.map(m => `Category [${m.category}]: ${m.text}`);
 
         // Update relationship interaction count
-        this.updateRelationship(1);
+        await this.updateRelationship(1);
 
         return {
             relevantMemories,
@@ -285,12 +285,12 @@ No markdown. No code blocks. Respond with JSON only.`;
 
             // 2. Update user profile details
             if (parsed.profileUpdates) {
-                this.updateProfile(parsed.profileUpdates);
+                await this.updateProfile(parsed.profileUpdates);
             }
 
             // 3. Update relationship points
             if (parsed.relationshipPoints) {
-                this.updateRelationship(parsed.relationshipPoints);
+                await this.updateRelationship(parsed.relationshipPoints);
             }
 
             // 4. Update the short term memory log to keep only remaining messages
@@ -303,9 +303,9 @@ No markdown. No code blocks. Respond with JSON only.`;
     }
 
     // Memory Cleanup (De-duplication of long-term entries)
-    cleanupMemories() {
+    async cleanupMemories() {
         try {
-            const memories = this.fileStore.readMemories();
+            const memories = await this.repository.readMemories();
             if (memories.length < 2) return;
 
             const uniqueMemories = [];
@@ -335,7 +335,7 @@ No markdown. No code blocks. Respond with JSON only.`;
 
             if (uniqueMemories.length !== memories.length) {
                 console.log(`[MemoryService] Cleaned up ${memories.length - uniqueMemories.length} duplicate long-term memories.`);
-                this.fileStore.writeMemories(uniqueMemories);
+                await this.repository.writeMemories(uniqueMemories);
             }
         } catch (error) {
             console.error("[MemoryService] Memory cleanup failed:", error);

@@ -11,9 +11,21 @@ class ExecutorAgent extends BaseAgent {
         this.listen('agent:Executor:request', async (payload) => {
             const { taskId, action, params } = payload;
             try {
-                // TODO: Wire up actual capability/service here
-                console.log(`[${this.name}] Executing ${action}`);
-                this.broadcast('agent:task:complete', { taskId, result: { success: true, message: `${this.name} finished ${action}` } });
+                // Action is the capabilityId
+                const capability = this.kernel.get("capabilityRegistry").get(action);
+                if (!capability) {
+                    throw new Error(`Capability ${action} is not registered.`);
+                }
+                
+                // For now, we assume capability has an execute method
+                // Or if it maps to a tool, we use the active ToolManager (mocked here if absent)
+                // Real implementation should invoke the capability's handler
+                if (typeof capability.execute === "function") {
+                    const result = await capability.execute(params);
+                    this.broadcast('agent:task:complete', { taskId, result });
+                } else {
+                    throw new Error(`Capability ${action} missing execute method.`);
+                }
             } catch (error) {
                 this.broadcast('agent:task:error', { taskId, error: error.message });
             }

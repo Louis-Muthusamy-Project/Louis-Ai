@@ -20,6 +20,17 @@ class CodingCapability extends BaseCapability {
 
     // 1. Terminal / Git / Run Project
     async runCommand(command, cwd = this.projectRoot) {
+        const PermissionService = require("../../services/permissionService");
+        if (!PermissionService.check("execute_shell")) {
+            return { success: false, message: "Error: Shell execution permission denied." };
+        }
+
+        // Basic blocklist for extremely dangerous commands
+        const blocked = ['rm -rf /', 'del /s /q c:\\', 'mkfs', 'format'];
+        if (blocked.some(b => command.toLowerCase().includes(b))) {
+            return { success: false, message: "Error: Command blocked by security policy." };
+        }
+
         try {
             const { stdout, stderr } = await execPromise(command, { cwd });
             return { success: true, stdout, stderr };

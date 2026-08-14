@@ -7,15 +7,14 @@ const StateMachine = require("./core/StateMachine");
 
 const SettingsFileStore = require("./infrastructure/SettingsFileStore");
 const SessionStore = require("./infrastructure/SessionStore");
-const MemoryFileStore = require("./infrastructure/MemoryFileStore");
-
+const FileMemoryRepository = require("./infrastructure/FileMemoryRepository");
+const MongoMemoryRepository = require("./infrastructure/MongoMemoryRepository");
 const ProviderManager = require("./providers/ProviderManager");
 
 const { SettingsService } = require("./services/settingsService");
 const { ConversationService } = require("./services/conversationService");
 const { MemoryService } = require("./services/memoryService");
 const { ContextService } = require("./services/contextService");
-const { EmotionService } = require("./services/emotionService");
 const EmotionEngine = require("./services/EmotionEngine");
 const PersonalityEngine = require("./services/PersonalityEngine");
 const { TTSService } = require("./services/ttsService");
@@ -37,8 +36,18 @@ function registerBindings() {
     // Infrastructure
     Kernel.register("settingsFileStore", new SettingsFileStore());
     Kernel.register("sessionStore", new SessionStore());
-    Kernel.register("memoryFileStore", new MemoryFileStore());
+    // Initialize canonical memory repository
+    const useMongo = process.env.NODE_ENV === "production" || process.env.USE_MONGO === "true";
+    let memoryRepository;
     
+    if (useMongo) {
+        memoryRepository = new MongoMemoryRepository();
+    } else {
+        memoryRepository = new FileMemoryRepository();
+    }
+    
+    Kernel.register("memoryRepository", memoryRepository);
+
     // Providers
     Kernel.register("providerManager", ProviderManager);
 
@@ -49,9 +58,10 @@ function registerBindings() {
     Kernel.register("contextService", ContextService);
     // EmotionEngine registered first (singleton, no Kernel dep)
     Kernel.register("emotionEngine", EmotionEngine);
-    Kernel.register("emotionService", new EmotionService(Kernel));
     Kernel.register("personalityEngine", new PersonalityEngine(Kernel));
     Kernel.register("ttsService", TTSService);
+    const permissionService = require("./services/permissionService");
+    Kernel.register("permissionService", permissionService);
     
     // Require and bind voiceService after ttsService is registered
     const voiceService = require("./services/voiceService");
@@ -128,6 +138,11 @@ async function bootstrap() {
     await ModuleRegistry.initializeAll(Kernel);
 
     // Start Multi-Agent System
+    const permissionService = Kernel.get("permissionService");
+    if (permissionService && permissionService.initialize) {
+        permissionService.initialize();
+    }
+
     const coordinator = Kernel.get("agentCoordinator");
     await coordinator.start();
     const agents = Kernel.get("agents");

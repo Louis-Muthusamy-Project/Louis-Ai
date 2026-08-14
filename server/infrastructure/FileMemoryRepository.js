@@ -1,13 +1,16 @@
 const fs = require("fs");
 const path = require("path");
 
+const MemoryRepository = require("./MemoryRepository");
+
 /**
  * ==========================================
- * MemoryFileStore - Infrastructure Adapter
+ * FileMemoryRepository - Local Fallback
  * ==========================================
  */
-class MemoryFileStore {
+class FileMemoryRepository extends MemoryRepository {
     constructor() {
+        super();
         this.memoriesPath = path.join(__dirname, "..", "data", "memories.json");
         this.profilePath = path.join(__dirname, "..", "data", "profile.json");
     }
@@ -111,4 +114,4 @@ class MemoryFileStore {
     }
 }
 
-module.exports = MemoryFileStore;
+module.exports = FileMemoryRepository;

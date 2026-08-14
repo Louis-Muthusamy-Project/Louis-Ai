@@ -11,9 +11,7 @@ class CodingAgent extends BaseAgent {
         this.listen('agent:Coding:request', async (payload) => {
             const { taskId, action, params } = payload;
             try {
-                // TODO: Wire up actual capability/service here
-                console.log(`[${this.name}] Executing ${action}`);
-                this.broadcast('agent:task:complete', { taskId, result: { success: true, message: `${this.name} finished ${action}` } });
+                throw new Error(`${this.name} capability for ${action} is not implemented yet.`);
             } catch (error) {
                 this.broadcast('agent:task:error', { taskId, error: error.message });
             }

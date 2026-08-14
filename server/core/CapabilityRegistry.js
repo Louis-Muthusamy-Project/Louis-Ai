@@ -12,6 +12,20 @@ class CapabilityRegistry {
         if (!capability || !capability.id) {
             throw new Error("Invalid capability. Must have a unique 'id'.");
         }
+        
+        // Enforce strict schema validation
+        const requiredFields = ["description", "permission", "riskLevel", "timeoutMs"];
+        for (const field of requiredFields) {
+            if (capability[field] === undefined) {
+                console.warn(`[CapabilityRegistry] Capability '${capability.id}' is missing required field: ${field}. Using default.`);
+            }
+        }
+        
+        capability.riskLevel = capability.riskLevel || "low";
+        capability.timeoutMs = capability.timeoutMs || 30000;
+        capability.supportCancellation = !!capability.supportCancellation;
+        capability.permission = capability.permission || "none";
+        
         this.capabilities.set(capability.id, capability);
     }
 

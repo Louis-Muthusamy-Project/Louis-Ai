@@ -27,36 +27,41 @@ class IntentDetector {
         const normalized = text.toLowerCase().trim();
 
         // 1. Fast Pattern Check (Regex)
-        // Time queries
-        if (
-            normalized.includes("time is it") ||
-            normalized.includes("current time") ||
-            normalized.includes("what time") ||
-            normalized.includes("what is the time") ||
-            normalized === "time"
-        ) {
-            return { intent: "USE_TOOL", tool: "time", args: {} };
+        // Basic fallback for simple exact matches to save tokens, although LLM is primary.
+        if (normalized === "time") {
+            return {
+                intent: "system",
+                confidence: 1.0,
+                parameters: { command: "time" },
+                riskLevel: "low",
+                requiresTool: true,
+                requiresConfirmation: false
+            };
         }
 
-        // Calculator queries (numbers and operators)
-        const mathRegex = /^(?:calculate|what is|whats)?\s*([0-9+\-*/().\s]+)$/;
-        const match = normalized.match(mathRegex);
-        if (match && /[0-9]/.test(match[1]) && /[+\-*/]/.test(match[1])) {
-            const expression = match[1].trim();
-            return { intent: "USE_TOOL", tool: "calculator", args: { expression } };
-        }
-
-        // 2. LLM-based classification fallback
+        // 2. LLM-based classification
         try {
-            const systemPrompt = `You are Yuna's Intent Classifier. Your job is to classify the user's message intent into one of:
-- CHAT: Conversational talk.
-- USE_TOOL: Requesting a math calculation, equation solver, or the current time.
+            const systemPrompt = `You are Yuna's Intent Classifier.
+Analyze the user message and classify the intent strictly into one of the following categories:
+- conversation
+- question
+- memory (e.g. "remember that I like X")
+- reminder
+- browser (e.g. "search the web", "open youtube")
+- desktop (e.g. "open vscode", "launch notepad")
+- coding
+- vision
+- voice
+- system (e.g. "what time is it")
 
-Provide a JSON object matching this schema:
+Provide a JSON object matching this schema EXACTLY:
 {
-  "intent": "CHAT" | "USE_TOOL",
-  "tool": "calculator" | "time" | null,
-  "args": { "expression": string } | {} | null
+  "intent": "string (one of the above)",
+  "confidence": number (0.0 to 1.0),
+  "parameters": object (any extracted entities/args),
+  "riskLevel": "low" | "medium" | "high" (high for dangerous commands like formatting drives, reading secrets, or irreversible actions),
+  "requiresTool": boolean,
+  "requiresConfirmation": boolean (true if riskLevel is high)
 }
 
 Response MUST be JSON only. No explanation. No markdown codeblocks.`;
@@ -65,9 +70,7 @@ Response MUST be JSON only. No explanation. No markdown codeblocks.`;
                 {
                     role: "user",
                     parts: [
-                        {
-                            text: `${systemPrompt}\n\nUser Message: "${text}"`
-                        }
+                        { text: `${systemPrompt}\n\nUser Message: "${text}"` }
                     ]
                 }
             ];
@@ -83,14 +86,31 @@ Response MUST be JSON only. No explanation. No markdown codeblocks.`;
             }
 
             const parsed = JSON.parse(jsonText);
+            
+            // Validate the result
+            const validIntents = [
+                "conversation", "question", "memory", "reminder", 
+                "browser", "desktop", "coding", "vision", "voice", "system"
+            ];
+            
             return {
-                intent: parsed.intent || "CHAT",
-                tool: parsed.tool || null,
-                args: parsed.args || null
+                intent: validIntents.includes(parsed.intent) ? parsed.intent : "conversation",
+                confidence: typeof parsed.confidence === "number" ? parsed.confidence : 1.0,
+                parameters: parsed.parameters || {},
+                riskLevel: ["low", "medium", "high"].includes(parsed.riskLevel) ? parsed.riskLevel : "low",
+                requiresTool: !!parsed.requiresTool,
+                requiresConfirmation: !!parsed.requiresConfirmation
             };
         } catch (error) {
-            console.warn("[IntentDetector] LLM classification failed, falling back to CHAT:", error.message);
-            return { intent: "CHAT", tool: null, args: null };
+            console.warn("[IntentDetector] LLM classification failed, falling back to conversation:", error.message);
+            return { 
+                intent: "conversation", 
+                confidence: 0, 
+                parameters: {}, 
+                riskLevel: "low", 
+                requiresTool: false, 
+                requiresConfirmation: false 
+            };
         }
     }
 }

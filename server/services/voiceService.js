@@ -12,7 +12,6 @@
  */
 const EventEmitter = require("events");
 const EdgeTTSProvider = require("../providers/tts/EdgeTTSProvider");
-const MockPremiumTTSProvider = require("../providers/tts/MockPremiumTTSProvider");
 const TTSService = require("./ttsService");
 
 // Bind default provider
@@ -34,8 +33,7 @@ class VoiceService extends EventEmitter {
         
         // Multi-provider registry
         this.providers = {
-            edge: new EdgeTTSProvider(),
-            premium: new MockPremiumTTSProvider()
+            edge: new EdgeTTSProvider()
         };
         this.activeProviderName = "edge";
 
@@ -187,24 +185,23 @@ class VoiceService extends EventEmitter {
 
     /**
      * Noise Reduction Filter
-     * Simulates basic noise gating and spectral subtraction on audio buffers.
+     * Real implementation would require a native C++ module or a robust web audio API in node.
+     * Removed fake pass-through.
      */
     applyNoiseReduction(buffer, threshold = 0.05) {
         if (!buffer) return null;
-        // Mock filter logic returning cleaned buffer
-        console.log(`[VoiceService] Applied Noise Reduction filter (Threshold: ${threshold})`);
+        // If no real implementation exists, we don't pretend to process it.
         return buffer;
     }
 
     /**
      * Voice Identification
-     * Compares voice acoustic fingerprint with registered profiles.
+     * Real implementation would require a speaker verification model.
+     * Removed fake mock implementation.
      */
     identifyVoice(audioFingerprint) {
-        if (audioFingerprint === "low-resonance-standard") {
-            return { identified: true, user: "Louis", confidence: 0.95 };
-        }
-        return { identified: false, user: "Guest", confidence: 0.50 };
+        // We do not pretend to identify voices if we lack the capability.
+        return { identified: false, user: "Guest", confidence: 0 };
     }
 
     /**

@@ -16,6 +16,7 @@ class AgentCoordinator extends BaseAgent {
         super("Coordinator", kernel);
         // Track active tasks
         this.activeTasks = new Map(); 
+        this.activeControllers = new Map(); // Maps socketId -> AbortController
     }
 
     /**
@@ -54,53 +55,170 @@ class AgentCoordinator extends BaseAgent {
      * 3. Return final result.
      * 
      * @async
-     * @param {string} socketId - The originating user's socket session.
-     * @param {string} text - The user's input text.
-     * @returns {Promise<string>} The synthesized response text.
+     * @returns {Promise<Object>} The synthesized response payload.
      */
-    async handleUserMessage(socketId, text) {
-        console.log(`[Agent:Coordinator] Handling message: "${text}"`);
+    async handleUserMessage(socketId, text, context, intentResult) {
+        // Setup AbortController for this session
+        if (this.activeControllers.has(socketId)) {
+            // Cancel previous active task for this user
+            this.cancelActiveTask(socketId);
+        }
         
+        const controller = new AbortController();
+        this.activeControllers.set(socketId, controller);
+        const signal = controller.signal;
+
+        this.broadcast("user.message.received", { socketId, text });
+        
+        console.log(`[Agent:Coordinator] Handling message: "${text}" with intent: ${intentResult.intent}`);
+        
+        this.broadcast("ai.thinking.started", { socketId });
+
         // Let Planner agent process intent and plan
-        const planResult = await this.delegateTask("Planner", "create_plan", { text, socketId });
+        const planResult = await this.kernel.get("taskPlanner").plan(context, intentResult);
         
-        if (planResult.directReply) {
-            return planResult.directReply;
+        this.broadcast("plan.created", { socketId, steps: planResult.steps });
+
+        if (!planResult.steps || planResult.steps.length === 0) {
+            return { type: "chat", message: null }; // Pass to Response Processor for normal chat
         }
 
         let finalResponse = "";
+        let completedSteps = [];
+        let failedStep = null;
         
         // Execute steps in the plan
         for (const step of planResult.steps) {
-            console.log(`[Agent:Coordinator] Executing step: ${step.action} via ${step.agent}`);
+            const agentName = this.resolveAgentForCapability(step.capability);
+            const capabilityMeta = this.kernel.get("capabilityRegistry").get(step.capability);
+            
+            console.log(`[Agent:Coordinator] Executing step: ${step.capability} via ${agentName}`);
             
             try {
-                const stepResult = await this.delegateTask(step.agent, step.action, step.params);
-                finalResponse += `\nStep ${step.action} completed: ${stepResult.message || "Success"}`;
+                // Permission / Risk Pipeline
+                if (capabilityMeta && capabilityMeta.riskLevel !== "low") {
+                    const permissionService = this.kernel.get("permissionService");
+                    const granted = await permissionService.requestPermission(
+                        socketId, 
+                        step.capability, 
+                        capabilityMeta.riskLevel, 
+                        step.args
+                    );
+                    
+                    if (!granted) {
+                        throw new Error(`Permission denied for capability: ${step.capability}`);
+                    }
+                }
+
+                if (signal.aborted) {
+                    throw new Error("Task execution was cancelled.");
+                }
+
+                this.broadcast("task.started", { socketId, capability: step.capability });
+                // Note: delegateTask should pass signal down to agents
+                const stepResult = await this.delegateTask(agentName, step.capability, step.args, signal);
+                this.broadcast("task.completed", { socketId, capability: step.capability, result: stepResult });
+                
+                completedSteps.push({ capability: step.capability, result: stepResult });
+                finalResponse += `\nStep ${step.capability} completed: ${stepResult.message || "Success"}`;
             } catch (error) {
-                finalResponse += `\nStep ${step.action} failed: ${error.message}`;
-                break; // Stop plan on failure
+                const isCancellation = error.message.includes("cancelled") || (error.name === "AbortError");
+                this.broadcast("task.failed", { socketId, capability: step.capability, error: error.message, cancelled: isCancellation });
+                failedStep = { capability: step.capability, error: error.message, cancelled: isCancellation };
+                finalResponse += `\nStep ${step.capability} ${isCancellation ? "cancelled" : "failed"}: ${error.message}`;
+                break; // Stop plan on failure or cancellation
             }
         }
 
-        return finalResponse || "I have completed the tasks.";
+        this.activeControllers.delete(socketId);
+
+        return {
+            type: failedStep ? "partial_failure" : "success",
+            completedSteps,
+            failedStep,
+            message: finalResponse
+        };
+    }
+
+    /**
+     * Cancels any active tasks for the given socket ID
+     */
+    cancelActiveTask(socketId) {
+        const controller = this.activeControllers.get(socketId);
+        if (controller) {
+            console.log(`[Agent:Coordinator] Cancelling active tasks for socket ${socketId}`);
+            controller.abort();
+            this.activeControllers.delete(socketId);
+        }
+    }
+
+    /**
+     * Resolves which agent should handle a given capability namespace.
+     * @param {string} capability 
+     */
+    resolveAgentForCapability(capability) {
+        if (!capability) return "Executor";
+        
+        if (capability.startsWith("browser.")) return "Browser";
+        if (capability.startsWith("coding.")) return "Coding";
+        if (capability.startsWith("memory.")) return "Memory";
+        if (capability.startsWith("vision.")) return "Vision";
+        if (capability.startsWith("voice.")) return "Voice";
+        if (capability.startsWith("system.")) return "Automation";
+        
+        return "Executor"; // Generic fallback
     }
 
     /**
      * Delegates a specific task to an agent and waits for completion over the EventBus.
      * Utilizes the SharedContext to track promise callbacks.
      * 
-     * @param {string} agentName - Target agent's name (e.g. 'Browser')
-     * @param {string} action - The action identifier (e.g. 'search')
-     * @param {Object} params - The payload dictionary
-     * @returns {Promise<Object>} The completed result payload from the agent.
+     * @param {string} agentName - The target agent name.
+     * @param {string} action - The action/capability to execute.
+     * @param {Object} params - The arguments payload.
+     * @param {AbortSignal} signal - Optional cancellation signal.
+     * @returns {Promise<any>}
      */
-    delegateTask(agentName, action, params) {
+    delegateTask(agentName, action, params, signal) {
         return new Promise((resolve, reject) => {
             const taskId = `task_${Date.now()}_${Math.floor(Math.random() * 1000)}`;
+
+            const onComplete = (payload) => {
+                if (payload.taskId === taskId) {
+                    cleanup();
+                    resolve(payload.result);
+                }
+            };
+
+            const onError = (payload) => {
+                if (payload.taskId === taskId) {
+                    cleanup();
+                    reject(new Error(payload.error));
+                }
+            };
+
+            const onAbort = () => {
+                cleanup();
+                reject(new Error("AbortError"));
+            };
+
+            const cleanup = () => {
+                this.kernel.get("eventBus").removeListener('agent:task:complete', onComplete);
+                this.kernel.get("eventBus").removeListener('agent:task:error', onError);
+                if (signal) {
+                    signal.removeEventListener("abort", onAbort);
+                }
+            };
+
+            this.kernel.get("eventBus").on('agent:task:complete', onComplete);
+            this.kernel.get("eventBus").on('agent:task:error', onError);
             
-            // Store promise callbacks in SharedContext so the listener can resolve them
-            this.writeContext(`task:${taskId}`, { resolve, reject, agentName, action });
+            if (signal) {
+                if (signal.aborted) {
+                    return onAbort();
+                }
+                signal.addEventListener("abort", onAbort);
+            }
 
             // Broadcast the task request
             this.broadcast(`agent:${agentName}:request`, {

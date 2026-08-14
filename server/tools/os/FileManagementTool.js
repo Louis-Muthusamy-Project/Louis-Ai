@@ -23,21 +23,38 @@ class FileManagementTool extends BaseTool {
         }
 
         try {
+            // Path normalization and security checks
+            const normalizedPath = path.normalize(path.resolve(targetPath));
+            
+            // Blocked directories
+            const blockedDirs = [
+                'C:\\Windows', 'C:\\Program Files', '/etc', '/var', '/usr/bin'
+            ].map(p => path.normalize(path.resolve(p)).toLowerCase());
+
+            const lowerPath = normalizedPath.toLowerCase();
+            if (blockedDirs.some(blocked => lowerPath.startsWith(blocked))) {
+                return "Error: Access to system directories is blocked for security reasons.";
+            }
+
+            // Prevent operations on .env or hidden critical files
+            if (normalizedPath.includes('.env') || normalizedPath.includes('.ssh')) {
+                return "Error: Access to secrets or sensitive files is blocked.";
+            }
             switch (action) {
                 case "read":
-                    return await fs.readFile(targetPath, "utf-8");
+                    return await fs.readFile(normalizedPath, "utf-8");
                 case "write":
-                    await fs.writeFile(targetPath, content || "", "utf-8");
-                    return `Successfully wrote to ${targetPath}`;
+                    await fs.writeFile(normalizedPath, content || "", "utf-8");
+                    return `Successfully wrote to ${normalizedPath}`;
                 case "list":
-                    const files = await fs.readdir(targetPath);
-                    return `Contents of ${targetPath}: \n${files.join("\n")}`;
+                    const files = await fs.readdir(normalizedPath);
+                    return `Contents of ${normalizedPath}: \n${files.join("\n")}`;
                 case "delete":
-                    await fs.rm(targetPath, { recursive: true, force: true });
-                    return `Successfully deleted ${targetPath}`;
+                    await fs.rm(normalizedPath, { recursive: true, force: true });
+                    return `Successfully deleted ${normalizedPath}`;
                 case "mkdir":
-                    await fs.mkdir(targetPath, { recursive: true });
-                    return `Successfully created directory ${targetPath}`;
+                    await fs.mkdir(normalizedPath, { recursive: true });
+                    return `Successfully created directory ${normalizedPath}`;
                 default:
                     return `Error: Unknown action '${action}'. Supported: read, write, list, delete, mkdir.`;
             }
