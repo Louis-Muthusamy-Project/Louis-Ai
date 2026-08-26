@@ -28,7 +28,7 @@ class SocketService {
 
         const url =
             import.meta.env.VITE_SOCKET_URL ||
-            "http://localhost:3000";
+            "http://localhost:4000";
 
         this.socket = io(url, {
             autoConnect: true,
