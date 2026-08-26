@@ -177,8 +177,10 @@ Memory: "${text}"`;
         return merged;
     }
 
-    async updateRelationship(points) {
-        const profile = await this.repository.readProfile();
+    async updateRelationship(points, profile = null) {
+        if (!profile) {
+            profile = await this.repository.readProfile();
+        }
         if (!profile.relationship) {
             profile.relationship = { level: 1, points: 0, firstInteraction: new Date().toISOString() };
         }
@@ -211,8 +213,7 @@ Memory: "${text}"`;
         const semanticResults = await this.searchSemanticMemory(userMessage, 4);
         const relevantMemories = semanticResults.map(m => `Category [${m.category}]: ${m.text}`);
 
-        // Update relationship interaction count
-        await this.updateRelationship(1);
+        await this.updateRelationship(1, JSON.parse(JSON.stringify(profile)));
 
         return {
             relevantMemories,

@@ -132,6 +132,17 @@ class PluginManager {
 
         this.watchers.set(pluginName, watcher);
     }
+
+    async shutdown() {
+        for (const [pluginName, watcher] of this.watchers) {
+            try {
+                await watcher.close();
+            } catch (error) {
+                console.error(`[PluginManager] Error closing watcher for ${pluginName}:`, error.message);
+            }
+        }
+        this.watchers.clear();
+    }
 }
 
 module.exports = PluginManager;

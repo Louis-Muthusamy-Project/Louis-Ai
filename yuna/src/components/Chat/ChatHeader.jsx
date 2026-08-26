@@ -1,30 +1,27 @@
 import React from "react";
-
-import { FiSettings } from "react-icons/fi";
+import { Avatar, Badge, Button, Tag, Tooltip, Typography } from "antd";
+import { SettingOutlined } from "@ant-design/icons";
 
 import useChatStore from "../../store/chatStore";
 import useLayoutStore from "../../store/layoutStore";
 
 import styles from "./chatHeader.module.css";
 
+const AVATAR_URL =
+    "https://res.cloudinary.com/dp4omlmzn/image/upload/v1783188927/Screenshot_2026-07-04_234010-removebg-preview_jnpupf.png";
+
 export default function ChatHeader() {
 
     const connected = useChatStore(
-
         state => state.connected
-
     );
 
     const thinking = useChatStore(
-
         state => state.thinking
-
     );
 
     const toggleDrawer = useLayoutStore(
-
         state => state.toggleDrawer
-
     );
 
     return (
@@ -33,63 +30,53 @@ export default function ChatHeader() {
 
             <div className={styles.left}>
 
-                <div className={styles.avatar} />
+                <Badge
+                    dot
+                    color={connected ? "#10b981" : "#dc2626"}
+                    offset={[-4, 36]}
+                >
+                    <Avatar
+                        size={42}
+                        src={AVATAR_URL}
+                        alt="Yuna"
+                    />
+                </Badge>
 
                 <div>
-
-                    <h2>
-
+                    <Typography.Title
+                        level={5}
+                        style={{ margin: 0, color: "white" }}
+                    >
                         Yuna
+                    </Typography.Title>
 
-                    </h2>
-
-                    <span>
-
-                        {
-
-                            connected
-
-                                ? "🟢 Connected"
-
-                                : "🔴 Disconnected"
-
-                        }
-
-                    </span>
-
+                    <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                        {connected ? "Connected" : "Disconnected"}
+                    </Typography.Text>
                 </div>
 
             </div>
 
             <div className={styles.center}>
-
-                {
-
-                    thinking
-
-                        ? "🧠 Thinking..."
-
-                        : "🎤 Ready"
-
-                }
-
+                <Tag
+                    color={thinking ? "purple" : "default"}
+                    bordered={false}
+                >
+                    {thinking ? "🧠 Thinking..." : "🎤 Ready"}
+                </Tag>
             </div>
 
-            <button
-
-                className={styles.settingsButton}
-
-                onClick={() =>
-
-                    toggleDrawer("settings")
-
-                }
-
-            >
-
-                <FiSettings />
-
-            </button>
+            <Tooltip title="Settings">
+                <Button
+                    className={styles.settingsButton}
+                    type="text"
+                    shape="circle"
+                    size="large"
+                    icon={<SettingOutlined />}
+                    aria-label="Open settings"
+                    onClick={() => toggleDrawer("settings")}
+                />
+            </Tooltip>
 
         </header>
 

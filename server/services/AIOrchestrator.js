@@ -201,59 +201,77 @@ class AIOrchestrator {
                 }
             ];
 
-            // 7. Execute Native Streaming with Retry System
             let streamResultText = "";
+            let hasStreamedAnyChunk = false;
 
-            await RetrySystem.execute(async () => {
-                streamResultText = await this.providerManager.stream(contents, {
-                    onStart: async () => {
-                        if (typeof onStart === "function") await onStart();
-                    },
-                    onChunk: async (chunkData) => {
-                        if (typeof onChunk === "function") await onChunk(chunkData);
-                    },
-                    onComplete: async (completeData) => {
-                        const text = completeData.text;
-                        
-                        // Log assistant response
-                        this.conversationService.addAssistantMessage(socketId, text);
-                        this.memoryService.addShortMemory(socketId, "assistant", text);
+            const maxAttempts = 3;
+            const baseDelay = 1000;
+            const backoffFactor = 2;
+            const timeoutMs = 30000;
 
-                        // Cognitive Emotion Analysis
-                        const emotionState = this.emotionEngine.analyzeText(socketId, text, intentResult.intent);
-                        const emotion = emotionState.toPrimaryEmotion();
-                        if (this.stateMachine) {
-                            this.stateMachine.setEmotion(emotion);
+            for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+                try {
+                    const streamPromise = this.providerManager.stream(contents, {
+                        onStart: async () => {
+                            if (typeof onStart === "function") await onStart();
+                        },
+                        onChunk: async (chunkData) => {
+                            hasStreamedAnyChunk = true;
+                            if (typeof onChunk === "function") await onChunk(chunkData);
+                        },
+                        onComplete: async (completeData) => {
+                            const text = completeData.text;
+                            
+                            // Log assistant response
+                            this.conversationService.addAssistantMessage(socketId, text);
+                            this.memoryService.addShortMemory(socketId, "assistant", text);
+
+                            // Cognitive Emotion Analysis
+                            const emotionState = this.emotionEngine.analyzeText(socketId, text, intentResult.intent);
+                            const emotion = emotionState.toPrimaryEmotion();
+                            if (this.stateMachine) {
+                                this.stateMachine.setEmotion(emotion);
+                            }
+
+                            // Queue voice audio synthesis
+                            try {
+                                this.voiceService.enqueue(text);
+                            } catch (vErr) {
+                                console.error("[AIOrchestrator] Voice Queue Error:", vErr);
+                            }
+
+                            if (typeof onComplete === "function") {
+                                await onComplete({
+                                    success: true,
+                                    text,
+                                    emotion,
+                                    emotionState: emotionState.toSummary(),
+                                    animation: this.emotionEngine.getAnimation(emotion),
+                                    voiceTone: this.emotionEngine.getVoiceTone(emotion),
+                                    createdAt: new Date().toISOString()
+                                });
+                            }
+                        },
+                        onError: async (err) => {
+                            throw err; // propagates to the catch below
                         }
+                    });
 
-                        // Queue voice audio synthesis
-                        try {
-                            this.voiceService.enqueue(text);
-                        } catch (vErr) {
-                            console.error("[AIOrchestrator] Voice Queue Error:", vErr);
-                        }
+                    const timeoutPromise = new Promise((_, reject) => {
+                        setTimeout(() => reject(new Error(`Operation timed out after ${timeoutMs}ms`)), timeoutMs);
+                    });
 
-                        if (typeof onComplete === "function") {
-                            await onComplete({
-                                success: true,
-                                text,
-                                emotion,
-                                emotionState: emotionState.toSummary(),
-                                animation: this.emotionEngine.getAnimation(emotion),
-                                voiceTone: this.emotionEngine.getVoiceTone(emotion),
-                                createdAt: new Date().toISOString()
-                            });
-                        }
-                    },
-                    onError: async (err) => {
-                        throw err; // propagates to retry logic
+                    streamResultText = await Promise.race([streamPromise, timeoutPromise]);
+                    break; // success
+                } catch (error) {
+                    if (hasStreamedAnyChunk || attempt >= maxAttempts) {
+                        throw error;
                     }
-                });
-            }, {
-                maxAttempts: 3,
-                delay: 1000,
-                timeoutMs: 30000
-            });
+                    const backoffDelay = baseDelay * Math.pow(backoffFactor, attempt - 1);
+                    console.warn(`[AIOrchestrator] Stream attempt ${attempt} failed before any chunk was sent. Retrying in ${backoffDelay}ms... Error: ${error.message}`);
+                    await new Promise(resolve => setTimeout(resolve, backoffDelay));
+                }
+            }
 
             const finalState = this.emotionEngine.getState(socketId);
             const finalEmotion = finalState.toPrimaryEmotion();

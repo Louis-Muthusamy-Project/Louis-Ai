@@ -1,35 +1,38 @@
 import { useEffect, useState } from "react";
+import { Descriptions, Spin } from "antd";
 import ElectronService from "../../services/electronService";
 
-export default function SystemInfo(){
+export default function SystemInfo() {
 
-    const [info,setInfo]=useState(null);
+    const [info, setInfo] = useState(null);
 
-    useEffect(()=>{
+    useEffect(() => {
 
         ElectronService
             .getSystemInfo()
             .then(setInfo);
 
-    },[]);
+    }, []);
 
-    if(!info){
-
-        return null;
-
+    if (!info) {
+        return <Spin size="small" />;
     }
 
-    return(
+    return (
 
-        <div>
-
-            <p>Platform : {info.platform}</p>
-
-            <p>CPU : {info.cpus}</p>
-
-            <p>RAM : {(info.memory/1024/1024/1024).toFixed(1)} GB</p>
-
-        </div>
+        <Descriptions
+            column={1}
+            size="small"
+            items={[
+                { key: "platform", label: "Platform", children: info.platform },
+                { key: "cpus", label: "CPU", children: info.cpus },
+                {
+                    key: "memory",
+                    label: "RAM",
+                    children: `${(info.memory / 1024 / 1024 / 1024).toFixed(1)} GB`
+                }
+            ]}
+        />
 
     );
 

@@ -1,4 +1,6 @@
 import React, { useState } from "react";
+import { Button, Input, Tooltip } from "antd";
+import { AudioOutlined, SendOutlined } from "@ant-design/icons";
 import { motion } from "framer-motion";
 
 import SocketService from "../../services/socketService";
@@ -23,9 +25,7 @@ export default function ChatComposer() {
         const text = input.trim();
 
         if (!text) return;
-
         if (typing || thinking) return;
-
         if (!SocketService.isConnected()) return;
 
         const id = crypto.randomUUID();
@@ -33,11 +33,8 @@ export default function ChatComposer() {
         addMessage({
 
             id,
-
             role: "user",
-
             text,
-
             createdAt: new Date().toISOString()
 
         });
@@ -47,11 +44,8 @@ export default function ChatComposer() {
             "yuna:message:send",
 
             {
-
                 id,
-
                 text
-
             }
 
         );
@@ -63,11 +57,8 @@ export default function ChatComposer() {
     function onKeyDown(e) {
 
         if (e.key === "Enter" && !e.shiftKey) {
-
             e.preventDefault();
-
             send();
-
         }
 
     }
@@ -75,106 +66,78 @@ export default function ChatComposer() {
     async function toggleMic() {
 
         if (!recording) {
-
             await MicrophoneService.start();
-
             setRecording(true);
-
             return;
-
         }
 
         const audioBlob = await MicrophoneService.stop();
-
         setRecording(false);
-
         console.log(audioBlob);
 
     }
+
+    const placeholder = thinking
+        ? "Yuna is thinking..."
+        : typing
+            ? "Yuna is replying..."
+            : "Say 'Hey Yuna' or type a message...";
 
     return (
 
         <div className={styles.composer}>
 
-            <motion.button
+            <Tooltip title={recording ? "Stop recording" : "Start voice input"}>
+                <motion.div
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    style={{ display: "inline-flex" }}
+                >
+                    <Button
+                        className={`${styles.micButton} ${recording ? styles.recording : ""}`}
+                        shape="circle"
+                        size="large"
+                        icon={<AudioOutlined />}
+                        aria-label={recording ? "Stop recording" : "Start voice input"}
+                        onClick={toggleMic}
+                    />
+                </motion.div>
+            </Tooltip>
 
-                className={`${styles.micButton} ${recording ? styles.recording : ""}`}
-
-                whileHover={{ scale: 1.03 }}
-
-                whileTap={{ scale: 0.97 }}
-
-                onClick={toggleMic}
-
-            >
-
-                🎤
-
-            </motion.button>
-
-            <textarea
-
+            <Input.TextArea
                 className={styles.input}
-
-                rows={1}
-
+                autoSize={{ minRows: 1, maxRows: 6 }}
                 value={input}
-
                 disabled={!connected}
-
                 onKeyDown={onKeyDown}
-
                 onChange={e => setInput(e.target.value)}
-
-                placeholder={
-
-                    thinking
-
-                        ? "Yuna is thinking..."
-
-                        : typing
-
-                            ? "Yuna is replying..."
-
-                            : "Say 'Hey Yuna' or type a message..."
-
-                }
-
+                placeholder={placeholder}
+                variant="borderless"
             />
 
-            <motion.button
-
-                className={styles.sendButton}
-
+            <motion.div
                 whileHover={{ scale: 1.03 }}
-
                 whileTap={{ scale: 0.97 }}
-
-                disabled={
-
-                    !input.trim()
-
-                    ||
-
-                    !connected
-
-                    ||
-
-                    typing
-
-                    ||
-
-                    thinking
-
-                }
-
-                onClick={send}
-
+                style={{ display: "inline-flex" }}
             >
-
-                Send
-
-            </motion.button>
+                <Button
+                    className={styles.sendButton}
+                    type="primary"
+                    icon={<SendOutlined />}
+                    disabled={
+                        !input.trim()
+                        ||
+                        !connected
+                        ||
+                        typing
+                        ||
+                        thinking
+                    }
+                    onClick={send}
+                >
+                    Send
+                </Button>
+            </motion.div>
 
         </div>
 

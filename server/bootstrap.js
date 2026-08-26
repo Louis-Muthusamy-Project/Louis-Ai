@@ -110,25 +110,25 @@ function registerBindings() {
         new LearningAgent(Kernel)
     ]);
 
-    // AI Orchestrator (Legacy/Bridge wrapper if needed)
     Kernel.register("aiOrchestrator", new AIOrchestrator(Kernel));
 }
 
 async function bootstrap() {
     console.log("Starting Yuna Kernel Boot Sequence...");
     
-    // Bind all dependencies
     registerBindings();
 
-    // Eagerly resolve and load basic tools/capabilities
+    const memoryRepository = Kernel.get("memoryRepository");
+    if (typeof memoryRepository.initialize === "function") {
+        await memoryRepository.initialize();
+    }
     const pluginLoader = Kernel.get("pluginLoader");
     const capabilityRegistry = Kernel.get("capabilityRegistry");
-    const ToolManager = require("./tools"); // Legacy or active ToolManager instance
+    const ToolManager = require("./tools"); 
 
     await pluginLoader.loadTools(ToolManager);
     await pluginLoader.loadCapabilities(capabilityRegistry);
 
-    // Initialize Advanced Plugin System
     const pluginManager = Kernel.get("pluginManager");
     await pluginManager.initialize();
 

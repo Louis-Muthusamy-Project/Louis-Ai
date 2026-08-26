@@ -2,7 +2,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import styles from './chatMessageBubble.module.css';
 
-export default function ChatMessageBubble({ message }) {
+function ChatMessageBubble({ message }) {
   const role = message?.role || 'assistant';
   const text = message?.text || '';
 
@@ -23,3 +23,4 @@ export default function ChatMessageBubble({ message }) {
   );
 }
 
+export default React.memo(ChatMessageBubble);

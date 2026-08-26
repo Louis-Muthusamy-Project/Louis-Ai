@@ -20,7 +20,7 @@ class CodingCapability extends BaseCapability {
 
     // 1. Terminal / Git / Run Project
     async runCommand(command, cwd = this.projectRoot) {
-        const PermissionService = require("../../services/permissionService");
+        const PermissionService = require("../services/permissionService");
         if (!PermissionService.check("execute_shell")) {
             return { success: false, message: "Error: Shell execution permission denied." };
         }

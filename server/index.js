@@ -50,6 +50,8 @@ async function startServer() {
 
         /**
          * Graceful Shutdown
+         * Closes, in order: Socket.IO, plugin file watchers, the MongoDB
+         * connection (if connected), then the HTTP server.
          */
 
         const shutdown = (signal) => {
@@ -60,12 +62,42 @@ async function startServer() {
             console.log("Stopping Yuna Server...");
             console.log("==================================");
 
-            server.close(() => {
+            (async () => {
+                try {
+                    io.close();
+                    console.log("Socket.IO Closed.");
+                } catch (error) {
+                    console.error("Error closing Socket.IO:", error.message);
+                }
 
-                console.log("HTTP Server Closed.");
-                process.exit(0);
+                try {
+                    const Kernel = require("./core/Kernel");
+                    const pluginManager = Kernel.get("pluginManager");
+                    if (pluginManager && typeof pluginManager.shutdown === "function") {
+                        await pluginManager.shutdown();
+                        console.log("Plugin Watchers Closed.");
+                    }
+                } catch (error) {
+                    console.error("Error stopping plugin watchers:", error.message);
+                }
 
-            });
+                try {
+                    const mongoose = require("mongoose");
+                    if (mongoose.connection.readyState === 1) {
+                        await mongoose.disconnect();
+                        console.log("MongoDB Connection Closed.");
+                    }
+                } catch (error) {
+                    console.error("Error closing MongoDB connection:", error.message);
+                }
+
+                server.close(() => {
+
+                    console.log("HTTP Server Closed.");
+                    process.exit(0);
+
+                });
+            })();
 
         };
 

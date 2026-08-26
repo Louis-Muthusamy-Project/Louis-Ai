@@ -1,124 +1,43 @@
-import { AnimatePresence, motion } from "framer-motion";
+import { Suspense, lazy } from "react";
+import { Drawer, Spin } from "antd";
 
 import useLayoutStore from "../../store/layoutStore";
 
-import SettingsView from "../../views/SettingsView/SettingsView";
-
-import styles from "./rightDrawer.module.css";
+const SettingsView = lazy(() => import("../../views/SettingsView/SettingsView"));
 
 export default function RightDrawer() {
 
     const open = useLayoutStore(
-
         state => state.rightDrawerOpen
-
     );
 
     const activeDrawer = useLayoutStore(
-
         state => state.activeDrawer
-
     );
 
     const closeDrawer = useLayoutStore(
-
         state => state.closeDrawer
-
     );
 
     return (
 
-        <AnimatePresence>
+        <Drawer
+            title={activeDrawer === "settings" ? "Settings" : activeDrawer}
+            open={open}
+            onClose={closeDrawer}
+            width={420}
+            destroyOnHidden
+        >
 
             {
-
-                open && (
-
-                    <>
-
-                        <motion.div
-
-                            className={styles.overlay}
-
-                            initial={{ opacity: 0 }}
-
-                            animate={{ opacity: 1 }}
-
-                            exit={{ opacity: 0 }}
-
-                            onClick={closeDrawer}
-
-                        />
-
-                        <motion.aside
-
-                            className={styles.drawer}
-
-                            initial={{ x: 420 }}
-
-                            animate={{ x: 0 }}
-
-                            exit={{ x: 420 }}
-
-                            transition={{
-
-                                duration: 0.25
-
-                            }}
-
-                        >
-
-                            <div className={styles.header}>
-
-                                <h2>
-
-                                    {
-
-                                        activeDrawer === "settings"
-
-                                            ? "Settings"
-
-                                            : activeDrawer
-
-                                    }
-
-                                </h2>
-
-                                <button
-
-                                    onClick={closeDrawer}
-
-                                >
-
-                                    ✕
-
-                                </button>
-
-                            </div>
-
-                            <div className={styles.content}>
-
-                                {
-
-                                    activeDrawer === "settings" && (
-
-                                        <SettingsView />
-
-                                    )
-
-                                }
-
-                            </div>
-
-                        </motion.aside>
-
-                    </>
-
+                activeDrawer === "settings" && (
+                    <Suspense fallback={<Spin size="large" style={{ margin: "40px auto", display: "block" }} />}>
+                        <SettingsView />
+                    </Suspense>
                 )
-
             }
 
-        </AnimatePresence>
+        </Drawer>
 
     );
 

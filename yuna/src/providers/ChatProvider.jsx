@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { App as AntApp } from "antd";
 
 import SocketService from "../services/socketService";
 import CharacterStateMachine from "../core/CharacterStateMachine";
@@ -6,8 +7,8 @@ import EmotionEngine from "../core/EmotionEngine";
 import useChatStore from "../store/chatStore";
 
 export default function ChatProvider({ children }) {
-    
 
+    const { message } = AntApp.useApp();
 
     useEffect(() => {
 
@@ -117,6 +118,8 @@ export default function ChatProvider({ children }) {
 
             CharacterStateMachine.idle();
 
+            message.error("Yuna couldn't complete that request. Please try again.");
+
         };
 
         SocketService.on("connect", onConnect);
@@ -159,7 +162,7 @@ export default function ChatProvider({ children }) {
 
         };
 
-    }, []);
+    }, [message]);
 
     return children;
 

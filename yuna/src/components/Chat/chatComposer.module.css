@@ -2,6 +2,8 @@
 
     display:flex;
 
+    align-items:flex-end;
+
     gap:12px;
 
     padding:16px;
@@ -16,49 +18,37 @@
 
     flex:1;
 
-    resize:none;
+    background:#25252d !important;
 
-    border:none;
+    color:white !important;
 
-    outline:none;
+    border-radius:12px !important;
 
-    border-radius:12px;
-
-    background:#25252d;
-
-    color:white;
-
-    padding:12px 16px;
+    padding:12px 16px !important;
 
     font-size:15px;
 
-    min-height:48px;
+}
+
+.input::placeholder{
+
+    color:#9ca3af;
 
 }
 
 .micButton{
 
-    width:50px;
-
-    height:50px;
-
-    border:none;
-
-    border-radius:50%;
-
-    cursor:pointer;
-
     background:#27272a;
 
     color:white;
 
-    font-size:18px;
+    border:none;
 
 }
 
 .recording{
 
-    background:#dc2626;
+    background:#dc2626 !important;
 
     animation:pulse 1s infinite;
 
@@ -66,48 +56,22 @@
 
 .sendButton{
 
-    width:110px;
-
-    border:none;
-
-    border-radius:12px;
-
-    cursor:pointer;
-
-    background:#7c3aed;
-
-    color:white;
-
     font-weight:600;
-
-}
-
-.sendButton:disabled{
-
-    opacity:.5;
-
-    cursor:not-allowed;
 
 }
 
 @keyframes pulse{
 
     0%{
-
         transform:scale(1);
-
     }
 
     50%{
-
         transform:scale(1.08);
-
     }
 
     100%{
-
         transform:scale(1);
-
     }
 
 }

@@ -29,3 +29,13 @@ Yuna supports third-party plugins loaded dynamically at runtime.
 ## 5. Client-Server Architecture
 - **Server (Node.js)**: Express for REST APIs (settings) and Socket.IO for real-time bidirectional communication (streaming text, emotion updates, vision processing).
 - **Client (React/Electron)**: A desktop frontend featuring Live2D rendering, interactive chat, and dynamic emotion states synchronized with the server's AI outputs.
+
+## 6. Capabilities vs. Tools (confirmed distinct, not duplicated)
+These look similar but serve two separate call paths:
+- **Capabilities** (`server/capabilities/`) are reached through the Agent pipeline: `AgentCoordinator` → an Agent → `capabilityRegistry.get(action).execute(...)`. Only `ExecutorAgent` and `AutomationAgent` currently do this.
+- **Tools** (`server/tools/`, via `ToolManager`) are exposed to the sandboxed Plugin system (`PluginSandbox` → `apis.toolManager`) and are not reachable from the Agent/chat pipeline — no agent currently calls `ToolManager`.
+
+`server/core/PluginLoader.js` is a naming false-friend: despite the name, it has nothing to do with the Plugin system in section 4. It only eagerly `require()`s every `*Tool.js` and `*Capability.js` file at boot and registers them into `ToolManager` / `capabilityRegistry`. The real plugin system is `PluginManager` (section 4).
+
+## 7. Current agent implementation status
+As of the Phase 2 audit: `ExecutorAgent` and `AutomationAgent` are implemented and dispatch to Capabilities. `BrowserAgent`, `CodingAgent`, `MemoryAgent`, `VisionAgent`, `VoiceAgent`, and `LearningAgent` are still stubs that immediately throw `"<name> capability for <action> is not implemented yet."` — this is pre-existing, not a regression.

@@ -1,13 +1,7 @@
 import { useEffect, useState } from "react";
 import EmotionEngine from "../core/EmotionEngine";
+import YunaEngine from "../core/YunaEngine";
 
-/**
- * ==========================================
- * useEmotionState - React Hook
- * ==========================================
- * Subscribes to EmotionEngine events and
- * exposes all 9 cognitive axes + helpers.
- */
 export default function useEmotionState() {
     const [emotionState, setEmotionState] = useState(EmotionEngine.getState());
 
@@ -17,14 +11,10 @@ export default function useEmotionState() {
         };
 
         // Subscribe via YunaEngine bus
-        import("../core/YunaEngine").then(({ default: YunaEngine }) => {
-            YunaEngine.on("emotion", handleEmotionUpdate);
-        });
+        YunaEngine.on("emotion", handleEmotionUpdate);
 
         return () => {
-            import("../core/YunaEngine").then(({ default: YunaEngine }) => {
-                YunaEngine.off("emotion", handleEmotionUpdate);
-            });
+            YunaEngine.off("emotion", handleEmotionUpdate);
         };
     }, []);
 

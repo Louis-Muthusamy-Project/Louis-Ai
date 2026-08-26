@@ -7,6 +7,18 @@
   background:linear-gradient(180deg, rgba(20,8,40,0.75), rgba(9,4,22,0.92));
   overflow:hidden;
 }
+@media (max-width: 1366px){
+  .wrap{
+    flex-basis:380px;
+    width:380px;
+  }
+}
+@media (max-width: 1280px){
+  .wrap{
+    flex-basis:320px;
+    width:320px;
+  }
+}
 .cityBg{
   position:absolute;
   inset:-20px;
@@ -77,4 +89,3 @@
   opacity:0.35;
   filter: blur(0.2px);
 }
-
