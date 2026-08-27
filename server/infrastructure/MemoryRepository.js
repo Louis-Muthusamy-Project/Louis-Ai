@@ -1,26 +1,22 @@
-/**
- * ==========================================
- * MemoryRepository - Base Interface
- * ==========================================
- */
+
 class MemoryRepository {
     async initialize() {
         // Setup connections if needed
     }
 
-    async readMemories() {
+    async readMemories(userId) {
         throw new Error("Method not implemented.");
     }
 
-    async writeMemories(memories) {
+    async writeMemories(userId, memories) {
         throw new Error("Method not implemented.");
     }
 
-    async readProfile() {
+    async readProfile(userId) {
         throw new Error("Method not implemented.");
     }
 
-    async writeProfile(profile) {
+    async writeProfile(userId, profile) {
         throw new Error("Method not implemented.");
     }
 }

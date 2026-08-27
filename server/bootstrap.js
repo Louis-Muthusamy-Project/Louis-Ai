@@ -9,8 +9,11 @@ const SettingsFileStore = require("./infrastructure/SettingsFileStore");
 const SessionStore = require("./infrastructure/SessionStore");
 const FileMemoryRepository = require("./infrastructure/FileMemoryRepository");
 const MongoMemoryRepository = require("./infrastructure/MongoMemoryRepository");
+const FileUserRepository = require("./infrastructure/FileUserRepository");
+const MongoUserRepository = require("./infrastructure/MongoUserRepository");
 const ProviderManager = require("./providers/ProviderManager");
 
+const { AuthService } = require("./services/authService");
 const { SettingsService } = require("./services/settingsService");
 const { ConversationService } = require("./services/conversationService");
 const { MemoryService } = require("./services/memoryService");
@@ -48,10 +51,14 @@ function registerBindings() {
     
     Kernel.register("memoryRepository", memoryRepository);
 
+    const userRepository = useMongo ? new MongoUserRepository() : new FileUserRepository();
+    Kernel.register("userRepository", userRepository);
+
     // Providers
     Kernel.register("providerManager", ProviderManager);
 
     // Services
+    Kernel.register("authService", new AuthService(Kernel));
     Kernel.register("settingsService", SettingsService);
     Kernel.register("conversationService", ConversationService);
     Kernel.register("memoryService", MemoryService);

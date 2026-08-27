@@ -4,6 +4,20 @@ const MemoryItem = require("../domain/MemoryItem");
 /**
  * ==========================================
  * MemoryService - Upgraded Service Class
+ * ------------------------------------------
+ * Short-term memory (this.shortMemory) is an in-process Map
+ * keyed by whatever identity the caller passes in - as of the
+ * auth work, chatController passes the authenticated user's id
+ * (socket.data.user.id), not socket.id, so it's naturally
+ * per-user without any change needed to this Map's own logic.
+ *
+ * Long-term memory (profile/semantic memories) is persisted via
+ * `repository`, which is now genuinely user-scoped: every method
+ * below that touches the repository takes an explicit `userId`
+ * and passes it straight through. That userId must always
+ * originate from a verified JWT further up the call chain
+ * (chatController -> AIOrchestrator -> here) - this service does
+ * not and should not validate identity itself.
  * ==========================================
  */
 class MemoryService {
@@ -22,15 +36,15 @@ class MemoryService {
     }
 
     // 1. Short-term Memory methods
-    getShortMemory(socketId) {
-        if (!this.shortMemory.has(socketId)) {
-            this.shortMemory.set(socketId, []);
+    getShortMemory(userId) {
+        if (!this.shortMemory.has(userId)) {
+            this.shortMemory.set(userId, []);
         }
-        return this.shortMemory.get(socketId);
+        return this.shortMemory.get(userId);
     }
 
-    addShortMemory(socketId, role, text) {
-        const memory = this.getShortMemory(socketId);
+    addShortMemory(userId, role, text) {
+        const memory = this.getShortMemory(userId);
         memory.push({
             role,
             text,
@@ -40,18 +54,18 @@ class MemoryService {
         if (memory.length > this.maxShortMemory) {
             // Trigger automatic background memory compression
             // We run it asynchronously to avoid blocking the user request
-            this.compressConversation(socketId).catch(err => {
+            this.compressConversation(userId).catch(err => {
                 console.error("[MemoryService] Background compression failed:", err);
             });
         }
     }
 
-    clearShortMemory(socketId) {
-        this.shortMemory.delete(socketId);
+    clearShortMemory(userId) {
+        this.shortMemory.delete(userId);
     }
 
-    getSummary(socketId) {
-        const memory = this.getShortMemory(socketId);
+    getSummary(userId) {
+        const memory = this.getShortMemory(userId);
         return memory.map(item => ({
             role: item.role,
             text: item.text
@@ -60,22 +74,22 @@ class MemoryService {
 
     // Legacy Key-Value mock long-term methods (to support existing requirements)
     async saveLongMemory(userId, key, value) {
-        const profile = await this.repository.readProfile();
+        const profile = await this.repository.readProfile(userId);
         if (!profile.user) profile.user = {};
         profile.user[key] = value;
-        await this.repository.writeProfile(profile);
+        await this.repository.writeProfile(userId, profile);
     }
 
     async getLongMemory(userId) {
-        const profile = await this.repository.readProfile();
+        const profile = await this.repository.readProfile(userId);
         return profile.user || {};
     }
 
     async removeLongMemory(userId, key) {
-        const profile = await this.repository.readProfile();
+        const profile = await this.repository.readProfile(userId);
         if (profile.user) {
             delete profile.user[key];
-            await this.repository.writeProfile(profile);
+            await this.repository.writeProfile(userId, profile);
         }
     }
 
@@ -96,10 +110,10 @@ class MemoryService {
     }
 
     // Save Long-term Memory item
-    async saveLongTermMemory(text, category = "general", importance = null) {
+    async saveLongTermMemory(userId, text, category = "general", importance = null) {
         try {
             const embedding = await this.providerManager.embed(text);
-            
+
             if (importance === null) {
                 importance = await this.scoreImportance(text);
             }
@@ -111,12 +125,12 @@ class MemoryService {
                 category
             });
 
-            const memories = await this.repository.readMemories();
+            const memories = await this.repository.readMemories(userId);
             memories.push(item.toJSON());
-            await this.repository.writeMemories(memories);
-            
+            await this.repository.writeMemories(userId, memories);
+
             // Trigger automatic cleanup after saving
-            this.cleanupMemories();
+            this.cleanupMemories(userId);
 
             return item;
         } catch (error) {
@@ -140,10 +154,10 @@ Memory: "${text}"`;
     }
 
     // Semantic Vector Search
-    async searchSemanticMemory(query, limit = 5, minSimilarity = 0.65) {
+    async searchSemanticMemory(userId, query, limit = 5, minSimilarity = 0.65) {
         try {
             const queryEmbedding = await this.providerManager.embed(query);
-            const memories = await this.repository.readMemories();
+            const memories = await this.repository.readMemories(userId);
 
             const scored = memories
                 .map(m => {
@@ -161,33 +175,33 @@ Memory: "${text}"`;
     }
 
     // Profile & Relationship operations
-    async getProfile() {
-        return await this.repository.readProfile();
+    async getProfile(userId) {
+        return await this.repository.readProfile(userId);
     }
 
-    async updateProfile(updates) {
-        const profile = await this.repository.readProfile();
+    async updateProfile(userId, updates) {
+        const profile = await this.repository.readProfile(userId);
         const merged = {
             ...profile,
             ...updates,
             user: { ...profile.user, ...updates.user },
             preferences: { ...profile.preferences, ...updates.preferences }
         };
-        await this.repository.writeProfile(merged);
+        await this.repository.writeProfile(userId, merged);
         return merged;
     }
 
-    async updateRelationship(points, profile = null) {
+    async updateRelationship(userId, points, profile = null) {
         if (!profile) {
-            profile = await this.repository.readProfile();
+            profile = await this.repository.readProfile(userId);
         }
         if (!profile.relationship) {
             profile.relationship = { level: 1, points: 0, firstInteraction: new Date().toISOString() };
         }
-        
+
         const rel = profile.relationship;
         rel.points += points;
-        
+
         const oldLevel = rel.level;
         rel.level = Math.min(10, Math.floor(rel.points / 10) + 1);
         rel.lastInteraction = new Date().toISOString();
@@ -201,19 +215,19 @@ Memory: "${text}"`;
             });
         }
 
-        await this.repository.writeProfile(profile);
+        await this.repository.writeProfile(userId, profile);
         return rel;
     }
 
     // Memory Retrieval Pipeline
-    async retrieveContextMemories(socketId, userMessage) {
-        const profile = await this.repository.readProfile();
-        
+    async retrieveContextMemories(userId, userMessage) {
+        const profile = await this.repository.readProfile(userId);
+
         // Find relevant long-term memories via semantic vector search
-        const semanticResults = await this.searchSemanticMemory(userMessage, 4);
+        const semanticResults = await this.searchSemanticMemory(userId, userMessage, 4);
         const relevantMemories = semanticResults.map(m => `Category [${m.category}]: ${m.text}`);
 
-        await this.updateRelationship(1, JSON.parse(JSON.stringify(profile)));
+        await this.updateRelationship(userId, 1, JSON.parse(JSON.stringify(profile)));
 
         return {
             relevantMemories,
@@ -227,11 +241,11 @@ Memory: "${text}"`;
     }
 
     // Memory Compression Pipeline (Background summary of chat)
-    async compressConversation(socketId) {
-        const history = this.getShortMemory(socketId);
+    async compressConversation(userId) {
+        const history = this.getShortMemory(userId);
         if (history.length < this.maxShortMemory) return;
 
-        console.log(`[MemoryService] Running conversation compression pipeline for socket: ${socketId}`);
+        console.log(`[MemoryService] Running conversation compression pipeline for user: ${userId}`);
 
         // Extract last 16 messages for compression
         const targetMessages = history.slice(0, 16);
@@ -267,7 +281,7 @@ No markdown. No code blocks. Respond with JSON only.`;
             ];
 
             const reply = await this.providerManager.generate(contents);
-            
+
             let jsonText = reply.trim();
             if (jsonText.startsWith("```json")) {
                 jsonText = jsonText.replace(/^```json/, "").replace(/```$/, "").trim();
@@ -280,22 +294,22 @@ No markdown. No code blocks. Respond with JSON only.`;
             // 1. Save new semantic memories
             if (parsed.newMemories && Array.isArray(parsed.newMemories)) {
                 for (const mem of parsed.newMemories) {
-                    await this.saveLongTermMemory(mem.text, mem.category || "general", mem.importance || 5);
+                    await this.saveLongTermMemory(userId, mem.text, mem.category || "general", mem.importance || 5);
                 }
             }
 
             // 2. Update user profile details
             if (parsed.profileUpdates) {
-                await this.updateProfile(parsed.profileUpdates);
+                await this.updateProfile(userId, parsed.profileUpdates);
             }
 
             // 3. Update relationship points
             if (parsed.relationshipPoints) {
-                await this.updateRelationship(parsed.relationshipPoints);
+                await this.updateRelationship(userId, parsed.relationshipPoints);
             }
 
             // 4. Update the short term memory log to keep only remaining messages
-            this.shortMemory.set(socketId, remainingMessages);
+            this.shortMemory.set(userId, remainingMessages);
 
             console.log("[MemoryService] Conversation compression pipeline completed successfully!");
         } catch (error) {
@@ -304,13 +318,13 @@ No markdown. No code blocks. Respond with JSON only.`;
     }
 
     // Memory Cleanup (De-duplication of long-term entries)
-    async cleanupMemories() {
+    async cleanupMemories(userId) {
         try {
-            const memories = await this.repository.readMemories();
+            const memories = await this.repository.readMemories(userId);
             if (memories.length < 2) return;
 
             const uniqueMemories = [];
-            
+
             for (const item of memories) {
                 let duplicate = false;
                 for (const existing of uniqueMemories) {
@@ -336,7 +350,7 @@ No markdown. No code blocks. Respond with JSON only.`;
 
             if (uniqueMemories.length !== memories.length) {
                 console.log(`[MemoryService] Cleaned up ${memories.length - uniqueMemories.length} duplicate long-term memories.`);
-                await this.repository.writeMemories(uniqueMemories);
+                await this.repository.writeMemories(userId, uniqueMemories);
             }
         } catch (error) {
             console.error("[MemoryService] Memory cleanup failed:", error);
@@ -346,13 +360,13 @@ No markdown. No code blocks. Respond with JSON only.`;
 
 // Wrapper object referencing Kernel's DI instance
 const wrapper = {
-    getShortMemory: (s) => Kernel.get("memoryService").getShortMemory(s),
-    addShortMemory: (s, r, t) => Kernel.get("memoryService").addShortMemory(s, r, t),
-    clearShortMemory: (s) => Kernel.get("memoryService").clearShortMemory(s),
+    getShortMemory: (u) => Kernel.get("memoryService").getShortMemory(u),
+    addShortMemory: (u, r, t) => Kernel.get("memoryService").addShortMemory(u, r, t),
+    clearShortMemory: (u) => Kernel.get("memoryService").clearShortMemory(u),
     saveLongMemory: (u, k, v) => Kernel.get("memoryService").saveLongMemory(u, k, v),
     getLongMemory: (u) => Kernel.get("memoryService").getLongMemory(u),
     removeLongMemory: (u, k) => Kernel.get("memoryService").removeLongMemory(u, k),
-    getSummary: (s) => Kernel.get("memoryService").getSummary(s)
+    getSummary: (u) => Kernel.get("memoryService").getSummary(u)
 };
 
 module.exports = Object.assign(wrapper, { MemoryService });

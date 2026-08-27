@@ -2,54 +2,45 @@ const fs = require("fs");
 const path = require("path");
 
 const MemoryRepository = require("./MemoryRepository");
+const { sanitizeUserId } = require("../utils/idSanitize");
 
-/**
- * ==========================================
- * FileMemoryRepository - Local Fallback
- * ==========================================
- */
 class FileMemoryRepository extends MemoryRepository {
     constructor() {
         super();
-        this.memoriesPath = path.join(__dirname, "..", "data", "memories.json");
-        this.profilePath = path.join(__dirname, "..", "data", "profile.json");
+        this.dataRoot = path.join(__dirname, "..", "data", "users");
+        this._locks = new Map(); // userId -> Promise chain
     }
 
-    /**
-     * Reads all long-term memory records from disk.
-     */
-    readMemories() {
-        if (!fs.existsSync(this.memoriesPath)) {
-            return [];
-        }
-        try {
-            const raw = fs.readFileSync(this.memoriesPath, "utf8");
-            return JSON.parse(raw);
-        } catch (error) {
-            console.error("[MemoryFileStore] Error reading memories file:", error);
-            return [];
-        }
+    _userDir(userId) {
+        return path.join(this.dataRoot, sanitizeUserId(userId));
     }
 
-    /**
-     * Writes all long-term memories to disk.
-     */
-    writeMemories(memories) {
-        try {
-            this.ensureDirExists(this.memoriesPath);
-            fs.writeFileSync(this.memoriesPath, JSON.stringify(memories, null, 4), "utf8");
-            return true;
-        } catch (error) {
-            console.error("[MemoryFileStore] Error writing memories file:", error);
-            return false;
+    _memoriesPath(userId) {
+        return path.join(this._userDir(userId), "memories.json");
+    }
+
+    _profilePath(userId) {
+        return path.join(this._userDir(userId), "profile.json");
+    }
+
+    _ensureDirExists(filePath) {
+        const dir = path.dirname(filePath);
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, { recursive: true });
         }
     }
 
-    /**
-     * Reads the structured user profile / preferences / relationship status from disk.
-     */
-    readProfile() {
-        const defaultProfile = {
+    /** Serializes all read-modify-write operations for a single user. */
+    _withUserLock(userId, fn) {
+        const key = sanitizeUserId(userId);
+        const previous = this._locks.get(key) || Promise.resolve();
+        const next = previous.then(fn, fn);
+        this._locks.set(key, next.catch(() => {}));
+        return next;
+    }
+
+    _defaultProfile() {
+        return {
             user: {
                 name: "User",
                 birthday: null,
@@ -73,44 +64,67 @@ class FileMemoryRepository extends MemoryRepository {
             },
             timeline: []
         };
+    }
 
-        if (!fs.existsSync(this.profilePath)) {
+    async readMemories(userId) {
+        const filePath = this._memoriesPath(userId);
+        if (!fs.existsSync(filePath)) {
+            return [];
+        }
+        try {
+            const raw = fs.readFileSync(filePath, "utf8");
+            return JSON.parse(raw);
+        } catch (error) {
+            console.error("[FileMemoryRepository] Error reading memories file:", error.message);
+            return [];
+        }
+    }
+
+    async writeMemories(userId, memories) {
+        return this._withUserLock(userId, () => {
+            try {
+                const filePath = this._memoriesPath(userId);
+                this._ensureDirExists(filePath);
+                fs.writeFileSync(filePath, JSON.stringify(memories, null, 4), "utf8");
+                return true;
+            } catch (error) {
+                console.error("[FileMemoryRepository] Error writing memories file:", error.message);
+                return false;
+            }
+        });
+    }
+
+    async readProfile(userId) {
+        const defaultProfile = this._defaultProfile();
+        const filePath = this._profilePath(userId);
+
+        if (!fs.existsSync(filePath)) {
             return defaultProfile;
         }
         try {
-            const raw = fs.readFileSync(this.profilePath, "utf8");
+            const raw = fs.readFileSync(filePath, "utf8");
             return {
                 ...defaultProfile,
                 ...JSON.parse(raw)
             };
         } catch (error) {
-            console.error("[MemoryFileStore] Error reading profile file:", error);
+            console.error("[FileMemoryRepository] Error reading profile file:", error.message);
             return defaultProfile;
         }
     }
 
-    /**
-     * Writes the structured user profile to disk.
-     */
-    writeProfile(profile) {
-        try {
-            this.ensureDirExists(this.profilePath);
-            fs.writeFileSync(this.profilePath, JSON.stringify(profile, null, 4), "utf8");
-            return true;
-        } catch (error) {
-            console.error("[MemoryFileStore] Error writing profile file:", error);
-            return false;
-        }
-    }
-
-    /**
-     * Ensures directory structure for the target file exists.
-     */
-    ensureDirExists(filePath) {
-        const dir = path.dirname(filePath);
-        if (!fs.existsSync(dir)) {
-            fs.mkdirSync(dir, { recursive: true });
-        }
+    async writeProfile(userId, profile) {
+        return this._withUserLock(userId, () => {
+            try {
+                const filePath = this._profilePath(userId);
+                this._ensureDirExists(filePath);
+                fs.writeFileSync(filePath, JSON.stringify(profile, null, 4), "utf8");
+                return true;
+            } catch (error) {
+                console.error("[FileMemoryRepository] Error writing profile file:", error.message);
+                return false;
+            }
+        });
     }
 }
 

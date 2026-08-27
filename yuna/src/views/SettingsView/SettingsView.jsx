@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { App as AntApp, Button, Input, Select, Slider, Switch, Tabs, Typography } from "antd";
-import { SaveOutlined } from "@ant-design/icons";
+import { SaveOutlined, LogoutOutlined } from "@ant-design/icons";
+import { useNavigate } from "react-router-dom";
 
 import useSettings from "../../hooks/useSettings";
 import useSettingsStore from "../../store/settingsStore";
+import useAuthStore from "../../store/authStore";
 import SystemInfo from "../../components/System/SystemInfo";
 
 import styles from "./settingsView.module.css";
@@ -14,6 +16,10 @@ export default function SettingsView() {
 
     const { save } = useSettings();
     const { message } = AntApp.useApp();
+    const navigate = useNavigate();
+
+    const user = useAuthStore(state => state.user);
+    const logout = useAuthStore(state => state.logout);
 
     const settings = useSettingsStore(
         state => state.settings
@@ -40,6 +46,11 @@ export default function SettingsView() {
             setSaving(false);
         }
 
+    }
+
+    async function handleLogout() {
+        await logout();
+        navigate("/login", { replace: true });
     }
 
     const items = [
@@ -144,6 +155,27 @@ export default function SettingsView() {
             children: (
                 <div className={styles.group}>
                     <SystemInfo />
+                </div>
+            )
+        },
+        {
+            key: "account",
+            label: "Account",
+            children: (
+                <div className={styles.group}>
+                    <div className={styles.field}>
+                        <Text className={styles.label}>Signed in as</Text>
+                        <Text>{user?.email || "—"}</Text>
+                    </div>
+
+                    <Button
+                        danger
+                        icon={<LogoutOutlined />}
+                        onClick={handleLogout}
+                        block
+                    >
+                        Log out
+                    </Button>
                 </div>
             )
         }

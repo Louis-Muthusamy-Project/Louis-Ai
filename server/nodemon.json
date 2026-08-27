@@ -1,2 +1,10 @@
 {
+  "ext": "js,mjs,cjs",
+  "ignore": [
+    "data/**",
+    "temp/**",
+    "node_modules/**",
+    "**/data/**",
+    "**/temp/**"
+  ]
 }

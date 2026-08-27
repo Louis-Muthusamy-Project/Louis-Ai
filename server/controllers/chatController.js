@@ -2,13 +2,17 @@
 const Kernel = require("../core/Kernel");
 const Events = require("../socket/socketEvents");
 
-/**
- * Handles incoming chat messages from a socket.
- * Utilizes the AIOrchestrator service via the Kernel DI container.
- * Emits socket events for client updates.
- */
 async function handleChatMessage(socket, payload = {}) {
     try {
+        const userId = socket.data && socket.data.user && socket.data.user.id;
+        if (!userId) {
+            socket.emit(Events.MESSAGE_ERROR, {
+                message: "Not authenticated.",
+                createdAt: new Date().toISOString()
+            });
+            return;
+        }
+
         const text = typeof payload.text === "string" ? payload.text.trim() : "";
         if (!text) {
             socket.emit(Events.MESSAGE_ERROR, {
@@ -21,9 +25,8 @@ async function handleChatMessage(socket, payload = {}) {
         const aiOrchestrator = Kernel.get("aiOrchestrator");
         const eventBus = Kernel.get("eventBus"); // For internal publish/subscribe if needed
 
-        // Stream reply using orchestrator callbacks
         const result = await aiOrchestrator.streamReply(
-            socket.id,
+            userId,
             text,
             {
                 onStart: async () => {

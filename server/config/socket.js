@@ -1,4 +1,5 @@
 const { Server } = require("socket.io");
+const { verifyAccessToken } = require("../utils/jwt");
 
 function createSocketServer(server) {
   const io = new Server(server, {
@@ -15,6 +16,27 @@ function createSocketServer(server) {
     pingTimeout: 60000,
 
     pingInterval: 25000,
+  });
+
+  io.use((socket, next) => {
+    const token = socket.handshake.auth && socket.handshake.auth.token;
+
+    if (!token) {
+      const error = new Error("Authentication required.");
+      error.data = { code: "NO_TOKEN" };
+      return next(error);
+    }
+
+    try {
+      const decoded = verifyAccessToken(token);
+      socket.data.user = { id: decoded.sub };
+      return next();
+    } catch (err) {
+      const code = err.name === "TokenExpiredError" ? "TOKEN_EXPIRED" : "INVALID_TOKEN";
+      const error = new Error("Invalid or expired session.");
+      error.data = { code };
+      return next(error);
+    }
   });
 
   io.engine.on("connection_error", (err) => {

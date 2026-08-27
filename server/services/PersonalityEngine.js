@@ -1,11 +1,3 @@
-/**
- * ==========================================
- * PersonalityEngine - Cognitive Adaptive Personality
- * ==========================================
- * Manages Yuna's adaptive personality states.
- * Integrates with Memory (relationship, profile preferences)
- * and Emotion (adapts energy/humor based on active affect).
- */
 const PersonalityState = require("../domain/PersonalityState");
 
 class PersonalityEngine {
@@ -29,19 +21,12 @@ class PersonalityEngine {
         return this._states.get(socketId);
     }
 
-    /**
-     * Core update cycle: adapt Yuna's personality traits based on:
-     *   1. User conversation style (formality mirroring, expressiveness)
-     *   2. Current emotional state (stress dampens humor, joy boosts energy)
-     *   3. Relationship progress (updates nickname and speaking style options)
-     *   4. Preference learning (extracts preferences and stores them)
-     */
-    async adapt(socketId, userMessage = "", emotionState = null) {
-        this._ensure(socketId);
-        const current = this._states.get(socketId);
+    async adapt(userId, userMessage = "", emotionState = null) {
+        this._ensure(userId);
+        const current = this._states.get(userId);
 
         // Fetch latest profile/relationship details from Memory Service
-        const profile = this.memoryService ? this.memoryService.getProfile() : {};
+        const profile = this.memoryService ? await this.memoryService.getProfile(userId) : {};
         const relLevel = profile.relationship?.level || current.relationshipLevel;
         const userName = profile.user?.name || "Louis";
 
@@ -52,11 +37,11 @@ class PersonalityEngine {
             
             if (prefMatch = lower.match(/(?:i love|i really like|i enjoy)\s+([a-zA-Z0-9\s_]{3,20})(?:\.|\!|\?|$)/)) {
                 const preference = prefMatch[1].trim();
-                await this.memoryService.saveLongTermMemory(`User likes: ${preference}`, "preference", 5);
+                await this.memoryService.saveLongTermMemory(userId, `User likes: ${preference}`, "preference", 5);
                 console.log(`[PersonalityEngine] Learned preference (like): ${preference}`);
             } else if (prefMatch = lower.match(/(?:i hate|i dislike|i don't like)\s+([a-zA-Z0-9\s_]{3,20})(?:\.|\!|\?|$)/)) {
                 const preference = prefMatch[1].trim();
-                await this.memoryService.saveLongTermMemory(`User dislikes: ${preference}`, "preference", 5);
+                await this.memoryService.saveLongTermMemory(userId, `User dislikes: ${preference}`, "preference", 5);
                 console.log(`[PersonalityEngine] Learned preference (dislike): ${preference}`);
             }
         }
@@ -149,7 +134,7 @@ class PersonalityEngine {
             greetingStyle: derivedGreetingStyle
         });
 
-        this._states.set(socketId, updated);
+        this._states.set(userId, updated);
         return updated;
     }
 }

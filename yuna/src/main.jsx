@@ -8,8 +8,6 @@ import { yunaThemeConfig } from "./theme/yunaTheme";
 
 import App from "./App";
 
-import ChatProvider from "./providers/ChatProvider";
-
 ReactDOM.createRoot(
 
     document.getElementById("root")
@@ -20,12 +18,7 @@ ReactDOM.createRoot(
         <ConfigProvider theme={yunaThemeConfig}>
             <AntApp>
                 <BrowserRouter>
-
-                    <ChatProvider>
-
-                        <App />
-
-                    </ChatProvider>
+                    <App />
                 </BrowserRouter>
             </AntApp>
         </ConfigProvider>

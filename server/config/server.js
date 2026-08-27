@@ -4,6 +4,8 @@ const cors = require("cors");
 const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const settingsRoutes = require("../routes/settingsRoutes");
+const authRoutes = require("../routes/auth.routes");
+const { requireAuth } = require("../middleware/authMiddleware");
 
 function createApp() {
 
@@ -40,17 +42,6 @@ function createApp() {
 
   );
 
-  app.use(
-
-    "/api/settings",
-
-    settingsRoutes
-
-  );
-
-  /**
-   * Body Parser
-   */
 
   app.use(
 
@@ -72,6 +63,18 @@ function createApp() {
 
     })
 
+  );
+
+  app.use(
+    "/api/auth",
+    authRoutes
+  );
+
+
+  app.use(
+    "/api/settings",
+    requireAuth,
+    settingsRoutes
   );
 
   /**
@@ -156,11 +159,16 @@ function createApp() {
 
     console.error(err);
 
-    res.status(err.status || 500).json({
+    const status = err.status || 500;
+
+    res.status(status).json({
 
       success: false,
 
-      message: err.message || "Internal Server Error"
+      // Never leak stack traces / internal details for unexpected errors.
+      message: status >= 500 ? "Internal Server Error" : (err.message || "Internal Server Error"),
+
+      code: err.code || "INTERNAL_ERROR"
 
     });
 

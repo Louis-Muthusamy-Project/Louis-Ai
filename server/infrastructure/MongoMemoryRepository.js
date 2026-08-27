@@ -3,6 +3,7 @@ const MemoryRepository = require("./MemoryRepository");
 
 // Define Schemas
 const MemorySchema = new mongoose.Schema({
+    userId: { type: String, required: true, index: true },
     text: { type: String, required: true },
     embedding: { type: [Number], required: true },
     importance: { type: Number, default: 5 },
@@ -12,6 +13,7 @@ const MemorySchema = new mongoose.Schema({
 });
 
 const ProfileSchema = new mongoose.Schema({
+    // _id IS the userId - one profile document per user.
     user: { type: mongoose.Schema.Types.Mixed, default: {} },
     preferences: { type: mongoose.Schema.Types.Mixed, default: {} },
     goals: { type: [mongoose.Schema.Types.Mixed], default: [] },
@@ -19,10 +21,6 @@ const ProfileSchema = new mongoose.Schema({
     relationship: { type: mongoose.Schema.Types.Mixed, default: {} },
     timeline: { type: [mongoose.Schema.Types.Mixed], default: [] }
 });
-
-// Since Yuna is single-user on desktop right now, we can use a single document for profile.
-// In a multi-user environment, we would key by userId.
-const SINGLE_USER_ID = "default_user";
 
 class MongoMemoryRepository extends MemoryRepository {
     constructor() {
@@ -39,8 +37,8 @@ class MongoMemoryRepository extends MemoryRepository {
         }
     }
 
-    async readMemories() {
-        const docs = await this.MemoryModel.find({}).lean();
+    async readMemories(userId) {
+        const docs = await this.MemoryModel.find({ userId }).lean();
         return docs.map(doc => ({
             id: doc._id.toString(),
             text: doc.text,
@@ -52,14 +50,11 @@ class MongoMemoryRepository extends MemoryRepository {
         }));
     }
 
-    async writeMemories(memories) {
-        // To support the legacy array-overwrite behavior of FileStore, 
-        // we can drop and insert, or intelligently upsert.
-        // For canonical Phase 1 memory, it's better to manage them properly.
-        // Since the current FileStore logic rewrites the entire array, we'll sync it here.
-        await this.MemoryModel.deleteMany({});
-        
+    async writeMemories(userId, memories) {
+        await this.MemoryModel.deleteMany({ userId });
+
         const bulk = memories.map(m => ({
+            userId,
             text: m.text,
             embedding: m.embedding,
             importance: m.importance,
@@ -67,16 +62,16 @@ class MongoMemoryRepository extends MemoryRepository {
             createdAt: m.createdAt || new Date(),
             updatedAt: m.updatedAt || new Date()
         }));
-        
+
         if (bulk.length > 0) {
             await this.MemoryModel.insertMany(bulk);
         }
         return true;
     }
 
-    async readProfile() {
-        const doc = await this.ProfileModel.findOne({ _id: SINGLE_USER_ID }).lean();
-        
+    async readProfile(userId) {
+        const doc = await this.ProfileModel.findOne({ _id: userId }).lean();
+
         const defaultProfile = {
             user: { name: "User", birthday: null, hobbies: [], job: null },
             preferences: { likes: [], dislikes: [], speechSpeed: "normal", topicsOfInterest: [] },
@@ -98,9 +93,9 @@ class MongoMemoryRepository extends MemoryRepository {
         };
     }
 
-    async writeProfile(profile) {
+    async writeProfile(userId, profile) {
         await this.ProfileModel.findOneAndUpdate(
-            { _id: SINGLE_USER_ID },
+            { _id: userId },
             {
                 user: profile.user,
                 preferences: profile.preferences,

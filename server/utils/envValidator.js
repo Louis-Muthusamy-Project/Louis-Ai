@@ -1,14 +1,8 @@
-/**
- * ==========================================
- * Environment Validator
- * ------------------------------------------
- * Validates required environment variables
- * before starting the server.
- * ==========================================
- */
+
 
 const REQUIRED_ENV = [
-    "GEMINI_API_KEY"
+    "GEMINI_API_KEY",
+    "JWT_SECRET"
 ];
 
 function validateEnvironment() {

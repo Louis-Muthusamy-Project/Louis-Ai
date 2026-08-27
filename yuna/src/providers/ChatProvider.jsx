@@ -5,16 +5,20 @@ import SocketService from "../services/socketService";
 import CharacterStateMachine from "../core/CharacterStateMachine";
 import EmotionEngine from "../core/EmotionEngine";
 import useChatStore from "../store/chatStore";
+import useAuthStore from "../store/authStore";
 
 export default function ChatProvider({ children }) {
 
     const { message } = AntApp.useApp();
+    const token = useAuthStore((state) => state.token);
 
     useEffect(() => {
 
+        if (!token) return undefined;
+
         CharacterStateMachine.idle();
 
-        SocketService.connect();
+        SocketService.connect(token);
 
         // Initialize cognitive emotion engine (subscribes to yuna:emotion:update)
         EmotionEngine.init();
@@ -162,7 +166,7 @@ export default function ChatProvider({ children }) {
 
         };
 
-    }, [message]);
+    }, [message, token]);
 
     return children;
 

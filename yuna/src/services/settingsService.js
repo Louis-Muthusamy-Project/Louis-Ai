@@ -1,17 +1,13 @@
-import axios from "axios";
+import apiClient from "./apiClient";
 
-const BASE_URL =
-    (import.meta.env.VITE_API_URL || "http://localhost:4000/api") +
-    "/settings";
+const SETTINGS_PATH = "/settings";
 
 class SettingsService {
 
     async getSettings() {
 
-        const { data } = await axios.get(
-
-            BASE_URL
-
+        const { data } = await apiClient.get(
+            SETTINGS_PATH
         );
 
         return data.settings;
@@ -20,12 +16,9 @@ class SettingsService {
 
     async saveSettings(settings) {
 
-        const { data } = await axios.put(
-
-            BASE_URL,
-
+        const { data } = await apiClient.put(
+            SETTINGS_PATH,
             settings
-
         );
 
         return data.settings;

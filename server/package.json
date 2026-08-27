@@ -6,16 +6,19 @@
   "type": "commonjs",
   "scripts": {
     "start": "node index.js",
-    "dev": "nodemon index.js"
+    "dev": "nodemon index.js",
+    "test": "node --test tests/*.test.js"
   },
   "dependencies": {
     "@google/genai": "^2.10.0",
+    "bcryptjs": "^2.4.3",
     "clipboardy": "^5.3.2",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "express-rate-limit": "^8.6.2",
     "helmet": "^8.3.0",
+    "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.5.1",
     "msedge-tts": "^2.0.6",
     "node-notifier": "^10.0.1",
@@ -25,6 +28,7 @@
     "systeminformation": "^5.33.1"
   },
   "devDependencies": {
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "socket.io-client": "^4.8.3"
   }
 }
