@@ -21,6 +21,17 @@ class AudioQueue {
             this.playing = true;
             this._notifyState(true);
         };
+
+        // Previously missing entirely - a decode/playback failure mid-track
+        // (e.g. malformed base64 audio data) left `playing` stuck true
+        // forever and stalled the whole queue. Treat it like `ended`: clear
+        // state and move on to the next queued track.
+        this.audio.onerror = () => {
+            console.warn("[AudioQueue] Playback error - skipping this track.", this.audio.error);
+            this.playing = false;
+            this._notifyState(false);
+            this.playNext();
+        };
     }
 
     _initAudioContext() {
@@ -94,6 +105,13 @@ class AudioQueue {
     stop() {
         this.audio.pause();
         this.audio.currentTime = 0;
+        // Release whatever the element was holding (previously left the
+        // last track's src in place after stop(), keeping it decoded/
+        // buffered). No object URLs are used here (audio is delivered as
+        // base64 data: URIs, not Blob/createObjectURL), so there's nothing
+        // to revoke - clearing src is the equivalent cleanup for this case.
+        this.audio.removeAttribute("src");
+        this.audio.load();
         this.queue = [];
         this.playing = false;
         this._notifyState(false);

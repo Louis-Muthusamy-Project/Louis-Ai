@@ -10,6 +10,13 @@ module.exports = {
 
     model: process.env.GEMINI_MODEL || "gemini-2.5-flash",
 
+    // Image-generation-capable Gemini model. Configurable via env so it
+    // can be updated as Google's model naming changes without a code
+    // change. See GeminiProvider.generateImage() - uses generateContent
+    // with responseModalities:["TEXT","IMAGE"], the same call shape as
+    // normal text generation, just against an image-capable model.
+    imageModel: process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image",
+
     generationConfig: {
 
         temperature: 0.8,

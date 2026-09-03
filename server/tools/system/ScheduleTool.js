@@ -9,21 +9,29 @@ class ScheduleTool extends BaseTool {
         );
     }
 
+    // NOTE: this Tool is not currently reached by the live chat pipeline
+    // (AutomationAgent calls capabilityRegistry.get("schedule").execute()
+    // directly - see ScheduleCapability.js). Kept in sync with it for when
+    // ToolManager-based dispatch is wired in, so it doesn't silently regress.
     async execute(args) {
-        const { action, params = {} } = args;
+        const { action, params = {}, ownerId } = args;
+
+        if (!ownerId) {
+            return { success: false, message: "Schedule tool requires an authenticated ownerId." };
+        }
 
         try {
             switch (action) {
                 case "setTimer":
-                    return await scheduleCapability.setTimer(params.durationInSeconds, params.message);
+                    return await scheduleCapability.setTimer(ownerId, params.durationInSeconds, params.message);
                 case "setReminder":
-                    return await scheduleCapability.setReminder(params.dateString, params.message);
+                    return await scheduleCapability.setReminder(ownerId, params.dateString, params.message);
                 case "setRecurring":
-                    return await scheduleCapability.setRecurring(params.cronExpression, params.message);
+                    return await scheduleCapability.setRecurring(ownerId, params.cronExpression, params.message);
                 case "listTasks":
-                    return scheduleCapability.listTasks();
+                    return scheduleCapability.listTasks(ownerId);
                 case "cancelTask":
-                    return await scheduleCapability.cancelTask(params.id);
+                    return await scheduleCapability.cancelTask(ownerId, params.id);
                 default:
                     return { success: false, message: `Unknown schedule action: ${action}` };
             }

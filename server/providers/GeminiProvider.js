@@ -107,6 +107,58 @@ class GeminiProvider extends BaseAIProvider {
         }
     }
 
+    /**
+     * Generates an image from a text prompt using the configured
+     * image-capable Gemini model (see config/gemini.js: imageModel).
+     * Uses the SAME generateContent() call shape as normal text
+     * generation - just with responseModalities including "IMAGE" and a
+     * different model - so this doesn't require a second SDK client or
+     * separate auth. Confirmed against the installed @google/genai
+     * version's type definitions (generateContent's config accepts
+     * responseModalities and its response parts can contain inlineData);
+     * NOT verified against a live API call, since this sandbox has no
+     * network access to Google's endpoints. Whether the configured
+     * GEMINI_API_KEY actually has this model enabled needs a real request
+     * in an environment with network access.
+     *
+     * @param {string} prompt
+     * @returns {Promise<{data: string, mimeType: string}>} base64 image data - never written to disk
+     */
+    async generateImage(prompt) {
+        if (!prompt || !prompt.trim()) {
+            throw new Error("Cannot generate an image from an empty prompt.");
+        }
+
+        try {
+            const response = await this.client.models.generateContent({
+                model: geminiConfig.imageModel,
+                contents: [{ role: "user", parts: [{ text: prompt }] }],
+                config: {
+                    responseModalities: ["TEXT", "IMAGE"]
+                }
+            });
+
+            const parts = response?.candidates?.[0]?.content?.parts || [];
+            const imagePart = parts.find(p => p.inlineData && p.inlineData.data);
+
+            if (!imagePart) {
+                throw new Error(
+                    "Gemini did not return image data. The configured model " +
+                    `(${geminiConfig.imageModel}) may not be enabled for this API key, ` +
+                    "or the request may have been blocked by safety filters."
+                );
+            }
+
+            return {
+                data: imagePart.inlineData.data, // base64 - caller decides what to do with it, never written to disk here
+                mimeType: imagePart.inlineData.mimeType || "image/png"
+            };
+        } catch (error) {
+            console.error("[GeminiProvider] Image generation failed:", error.message);
+            throw new Error("Unable to generate image.");
+        }
+    }
+
     async embed(text) {
         try {
             if (!text || !text.trim()) {

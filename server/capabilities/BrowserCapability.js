@@ -3,7 +3,12 @@ const puppeteer = require("puppeteer");
 
 class BrowserCapability extends BaseCapability {
     constructor() {
-        super("browser", "Browser Automation and Management");
+        super("browser", "Browser Automation and Management", {
+            description: "Headless browser automation - navigation, search, tabs, forms, cookies, downloads, bookmarks - for the requesting user's session.",
+            permission: "network",
+            riskLevel: "high",
+            timeoutMs: 30000
+        });
         this.browser = null;
         this.pages = []; // Tabs
         this.activePageIndex = 0;
@@ -31,8 +36,36 @@ class BrowserCapability extends BaseCapability {
         return this.pages[this.activePageIndex];
     }
 
-    async execute(input) {
-        return { success: true, message: "Browser capability active" };
+    /**
+     * Entry point used by the agent/plan pipeline. Previously this was a
+     * stub that always returned {success:true} without doing anything -
+     * every method below (navigate, search, tabs, forms, cookies,
+     * downloads, bookmarks) was fully implemented but unreachable from
+     * the live chat/agent pipeline because nothing dispatched to them.
+     */
+    async execute(input = {}) {
+        const { action, params = {} } = input;
+
+        switch (action) {
+            case "navigate": return this.navigate(params.url);
+            case "readText": return this.readText();
+            case "search": return this.search(params.query);
+            case "newTab": return this.newTab();
+            case "switchTab": return this.switchTab(params.index);
+            case "closeTab": return this.closeTab(params.index);
+            case "getHistory": return this.getHistory();
+            case "addBookmark": return this.addBookmark(params.url);
+            case "getBookmarks": return this.getBookmarks();
+            case "getCookies": return this.getCookies();
+            case "setCookie": return this.setCookie(params.cookie);
+            case "fillForm": return this.fillForm(params.selector, params.value);
+            case "submitForm": return this.submitForm(params.selector);
+            case "enableDownloads": return this.enableDownloads(params.downloadPath);
+            case "setMemory": return this.setMemory(params.key, params.value);
+            case "getMemory": return this.getMemory(params.key);
+            default:
+                return { success: false, message: `Unknown browser action: ${action}` };
+        }
     }
 
     // 1. Browser Automation & Reading

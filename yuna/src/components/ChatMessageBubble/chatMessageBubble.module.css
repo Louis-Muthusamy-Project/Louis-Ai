@@ -24,4 +24,27 @@
   font-size:14px;
   color: rgba(255,255,255,0.92);
 }
+.imageLoading{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  font-size:13px;
+  color: rgba(255,255,255,0.7);
+  padding:4px 0;
+}
+.imageError{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+  font-size:13px;
+  color: rgba(255,140,140,0.9);
+}
+.generatedImage{
+  max-width:100%;
+  max-height:360px;
+  border-radius:12px;
+  display:block;
+  margin-top:4px;
+}
 

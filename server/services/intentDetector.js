@@ -51,6 +51,7 @@ Analyze the user message and classify the intent strictly into one of the follow
 - desktop (e.g. "open vscode", "launch notepad")
 - coding
 - vision
+- image (e.g. "generate a picture of X", "draw me an anime girl under cherry blossoms")
 - voice
 - system (e.g. "what time is it")
 
@@ -90,7 +91,7 @@ Response MUST be JSON only. No explanation. No markdown codeblocks.`;
             // Validate the result
             const validIntents = [
                 "conversation", "question", "memory", "reminder", 
-                "browser", "desktop", "coding", "vision", "voice", "system"
+                "browser", "desktop", "coding", "vision", "image", "voice", "system"
             ];
             
             return {

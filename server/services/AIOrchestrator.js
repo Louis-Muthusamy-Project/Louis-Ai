@@ -108,7 +108,7 @@ class AIOrchestrator {
 
             // 10. Queue voice audio synthesis
             try {
-                this.voiceService.enqueue(reply);
+                this.voiceService.enqueue(reply, socketId);
             } catch (error) {
                 console.error("[AIOrchestrator] Voice Queue Error:", error);
             }
@@ -235,7 +235,7 @@ class AIOrchestrator {
 
                             // Queue voice audio synthesis
                             try {
-                                this.voiceService.enqueue(text);
+                                this.voiceService.enqueue(text, socketId);
                             } catch (vErr) {
                                 console.error("[AIOrchestrator] Voice Queue Error:", vErr);
                             }

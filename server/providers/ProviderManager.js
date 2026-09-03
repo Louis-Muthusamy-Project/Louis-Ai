@@ -95,6 +95,16 @@ class ProviderManager {
         }
         throw new Error("Active AI provider does not support embeddings.");
     }
+
+    async generateImage(prompt) {
+        if (!this.provider) {
+            throw new Error("No active AI provider configured.");
+        }
+        if (typeof this.provider.generateImage === "function") {
+            return this.provider.generateImage(prompt);
+        }
+        throw new Error("Active AI provider does not support image generation.");
+    }
 }
 
 module.exports = ProviderManager;

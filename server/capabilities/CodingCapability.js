@@ -6,7 +6,12 @@ const BaseCapability = require("./BaseCapability");
 
 class CodingCapability extends BaseCapability {
     constructor() {
-        super("coding", "AI Coding Agent tasks");
+        super("coding", "AI Coding Agent tasks", {
+            description: "Runs project shell commands (permission-gated) and AI-assisted code review/documentation/error-analysis for the requesting user.",
+            permission: "shell",
+            riskLevel: "high",
+            timeoutMs: 30000
+        });
         this.projectRoot = path.resolve(__dirname, "../../");
     }
 
@@ -14,8 +19,31 @@ class CodingCapability extends BaseCapability {
         this.providerManager = kernel.get("providerManager");
     }
 
-    async execute(input) {
-        return { success: true, message: "Coding capability active" };
+    /**
+     * Entry point used by the agent/plan pipeline. Previously this was a
+     * stub that always returned {success:true} without doing anything -
+     * runCommand/reviewCode/etc below were fully implemented but never
+     * reachable from here.
+     */
+    async execute(input = {}) {
+        const { action, params = {} } = input;
+
+        switch (action) {
+            case "runCommand":
+                return this.runCommand(params.command, params.cwd);
+            case "openInVSCode":
+                return this.openInVSCode(params.filePath);
+            case "reviewCode":
+                return this.reviewCode(params.fileContent);
+            case "generateDocumentation":
+                return this.generateDocumentation(params.fileContent);
+            case "analyzeError":
+                return this.analyzeError(params.errorText);
+            case "reviewArchitecture":
+                return this.reviewArchitecture(params.context);
+            default:
+                return { success: false, message: `Unknown coding action: ${action}` };
+        }
     }
 
     // 1. Terminal / Git / Run Project

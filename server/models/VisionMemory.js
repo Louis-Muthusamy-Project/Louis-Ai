@@ -1,6 +1,14 @@
 const mongoose = require('mongoose');
 
 const visionMemorySchema = new mongoose.Schema({
+  // Owner of this vision analysis. Required for all new records; see
+  // migration note in visionService.js for how pre-existing records
+  // (saved before this field existed) are handled.
+  userId: {
+    type: String,
+    required: true,
+    index: true
+  },
   timestamp: {
     type: Date,
     default: Date.now

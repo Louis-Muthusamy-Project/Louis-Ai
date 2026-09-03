@@ -63,6 +63,14 @@ const SocketEvents = Object.freeze({
 
     VOICE_END: "yuna:voice:end",
 
+    VOICE_ERROR: "yuna:voice:error",
+
+    IMAGE_START: "yuna:image:start",
+
+    IMAGE_RESULT: "yuna:image:result",
+
+    IMAGE_ERROR: "yuna:image:error",
+
     /**
      * Character
      */

@@ -9,10 +9,14 @@ class VisionService {
 
     /**
      * Process an image (base64) using Gemini and store the result in memory.
+     * @param {string} userId - Authenticated owner of this analysis (never trust a client-supplied id here).
      * @param {string} base64Image - The image data (e.g. data:image/jpeg;base64,...)
      * @param {string} source - 'camera', 'screen', etc.
      */
-    async processImage(base64Image, source = 'screen') {
+    async processImage(userId, base64Image, source = 'screen') {
+        if (!userId) {
+            throw new Error("processImage requires an authenticated userId.");
+        }
         try {
             // Remove the data URL prefix if present
             const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
@@ -50,8 +54,9 @@ class VisionService {
                 result = { description: response.text(), ocrSummary: "", objects: [] };
             }
 
-            // Save to memory
+            // Save to memory, scoped to the owning user
             const memory = new VisionMemory({
+                userId,
                 source,
                 description: result.description || '',
                 ocrText: result.ocrSummary || '',
@@ -66,8 +71,15 @@ class VisionService {
         }
     }
 
-    async getRecentContext(limit = 5) {
-        return await VisionMemory.find().sort({ timestamp: -1 }).limit(limit);
+    /**
+     * @param {string} userId - Authenticated owner; results are always filtered to this user.
+     * @param {number} limit
+     */
+    async getRecentContext(userId, limit = 5) {
+        if (!userId) {
+            throw new Error("getRecentContext requires an authenticated userId.");
+        }
+        return await VisionMemory.find({ userId }).sort({ timestamp: -1 }).limit(limit);
     }
 }
 

@@ -25,6 +25,25 @@ class MemoryService {
         this.kernel = kernel;
         this.shortMemory = new Map();
         this.maxShortMemory = 20;
+        this._longTermLocks = new Map(); // userId -> Promise chain
+    }
+
+    /**
+     * Serializes the read -> modify -> write cycle for a user's long-term
+     * memory. The repository's own per-user lock (MongoMemoryRepository)
+     * only protects the write call itself; saveLongTermMemory/
+     * cleanupMemories do readMemories() then push/dedupe in JS before
+     * calling writeMemories() - two concurrent calls for the same user
+     * (a real scenario: cleanupMemories is fired without being awaited
+     * right after saveLongTermMemory) can each read the same stale
+     * snapshot and the second write silently discards the first's
+     * addition. This closes that at the point the race actually happens.
+     */
+    _withLongTermLock(userId, fn) {
+        const previous = this._longTermLocks.get(userId) || Promise.resolve();
+        const next = previous.then(fn, fn);
+        this._longTermLocks.set(userId, next.catch(() => {}));
+        return next;
     }
 
     get repository() {
@@ -74,10 +93,12 @@ class MemoryService {
 
     // Legacy Key-Value mock long-term methods (to support existing requirements)
     async saveLongMemory(userId, key, value) {
-        const profile = await this.repository.readProfile(userId);
-        if (!profile.user) profile.user = {};
-        profile.user[key] = value;
-        await this.repository.writeProfile(userId, profile);
+        return this._withLongTermLock(userId, async () => {
+            const profile = await this.repository.readProfile(userId);
+            if (!profile.user) profile.user = {};
+            profile.user[key] = value;
+            await this.repository.writeProfile(userId, profile);
+        });
     }
 
     async getLongMemory(userId) {
@@ -86,11 +107,13 @@ class MemoryService {
     }
 
     async removeLongMemory(userId, key) {
-        const profile = await this.repository.readProfile(userId);
-        if (profile.user) {
-            delete profile.user[key];
-            await this.repository.writeProfile(userId, profile);
-        }
+        return this._withLongTermLock(userId, async () => {
+            const profile = await this.repository.readProfile(userId);
+            if (profile.user) {
+                delete profile.user[key];
+                await this.repository.writeProfile(userId, profile);
+            }
+        });
     }
 
     // 2. New Cognitive Memory System methods
@@ -125,11 +148,16 @@ class MemoryService {
                 category
             });
 
-            const memories = await this.repository.readMemories(userId);
-            memories.push(item.toJSON());
-            await this.repository.writeMemories(userId, memories);
+            await this._withLongTermLock(userId, async () => {
+                const memories = await this.repository.readMemories(userId);
+                memories.push(item.toJSON());
+                await this.repository.writeMemories(userId, memories);
+            });
 
-            // Trigger automatic cleanup after saving
+            // Trigger automatic cleanup after saving. Not awaited by design
+            // (fire-and-forget so the caller isn't blocked on cleanup), but
+            // it goes through the same per-user lock as the write above, so
+            // it can no longer race the save it follows.
             this.cleanupMemories(userId);
 
             return item;
@@ -180,43 +208,47 @@ Memory: "${text}"`;
     }
 
     async updateProfile(userId, updates) {
-        const profile = await this.repository.readProfile(userId);
-        const merged = {
-            ...profile,
-            ...updates,
-            user: { ...profile.user, ...updates.user },
-            preferences: { ...profile.preferences, ...updates.preferences }
-        };
-        await this.repository.writeProfile(userId, merged);
-        return merged;
+        return this._withLongTermLock(userId, async () => {
+            const profile = await this.repository.readProfile(userId);
+            const merged = {
+                ...profile,
+                ...updates,
+                user: { ...profile.user, ...updates.user },
+                preferences: { ...profile.preferences, ...updates.preferences }
+            };
+            await this.repository.writeProfile(userId, merged);
+            return merged;
+        });
     }
 
     async updateRelationship(userId, points, profile = null) {
-        if (!profile) {
-            profile = await this.repository.readProfile(userId);
-        }
-        if (!profile.relationship) {
-            profile.relationship = { level: 1, points: 0, firstInteraction: new Date().toISOString() };
-        }
+        return this._withLongTermLock(userId, async () => {
+            if (!profile) {
+                profile = await this.repository.readProfile(userId);
+            }
+            if (!profile.relationship) {
+                profile.relationship = { level: 1, points: 0, firstInteraction: new Date().toISOString() };
+            }
 
-        const rel = profile.relationship;
-        rel.points += points;
+            const rel = profile.relationship;
+            rel.points += points;
 
-        const oldLevel = rel.level;
-        rel.level = Math.min(10, Math.floor(rel.points / 10) + 1);
-        rel.lastInteraction = new Date().toISOString();
-        rel.interactionCount = (rel.interactionCount || 0) + 1;
+            const oldLevel = rel.level;
+            rel.level = Math.min(10, Math.floor(rel.points / 10) + 1);
+            rel.lastInteraction = new Date().toISOString();
+            rel.interactionCount = (rel.interactionCount || 0) + 1;
 
-        if (rel.level > oldLevel) {
-            if (!profile.timeline) profile.timeline = [];
-            profile.timeline.push({
-                event: `Leveled up relationship with Yuna to Level ${rel.level}!`,
-                timestamp: new Date().toISOString()
-            });
-        }
+            if (rel.level > oldLevel) {
+                if (!profile.timeline) profile.timeline = [];
+                profile.timeline.push({
+                    event: `Leveled up relationship with Yuna to Level ${rel.level}!`,
+                    timestamp: new Date().toISOString()
+                });
+            }
 
-        await this.repository.writeProfile(userId, profile);
-        return rel;
+            await this.repository.writeProfile(userId, profile);
+            return rel;
+        });
     }
 
     // Memory Retrieval Pipeline
@@ -320,38 +352,40 @@ No markdown. No code blocks. Respond with JSON only.`;
     // Memory Cleanup (De-duplication of long-term entries)
     async cleanupMemories(userId) {
         try {
-            const memories = await this.repository.readMemories(userId);
-            if (memories.length < 2) return;
+            await this._withLongTermLock(userId, async () => {
+                const memories = await this.repository.readMemories(userId);
+                if (memories.length < 2) return;
 
-            const uniqueMemories = [];
+                const uniqueMemories = [];
 
-            for (const item of memories) {
-                let duplicate = false;
-                for (const existing of uniqueMemories) {
-                    const similarity = this.cosineSimilarity(item.embedding, existing.embedding);
-                    // If similarity is extremely high (> 0.9), merge or discard duplicate
-                    if (similarity > 0.9) {
-                        duplicate = true;
-                        // Keep the one with higher importance
-                        if (item.importance > existing.importance) {
-                            existing.text = item.text;
-                            existing.importance = item.importance;
-                            existing.embedding = item.embedding;
-                            existing.category = item.category;
-                            existing.updatedAt = new Date().toISOString();
+                for (const item of memories) {
+                    let duplicate = false;
+                    for (const existing of uniqueMemories) {
+                        const similarity = this.cosineSimilarity(item.embedding, existing.embedding);
+                        // If similarity is extremely high (> 0.9), merge or discard duplicate
+                        if (similarity > 0.9) {
+                            duplicate = true;
+                            // Keep the one with higher importance
+                            if (item.importance > existing.importance) {
+                                existing.text = item.text;
+                                existing.importance = item.importance;
+                                existing.embedding = item.embedding;
+                                existing.category = item.category;
+                                existing.updatedAt = new Date().toISOString();
+                            }
+                            break;
                         }
-                        break;
+                    }
+                    if (!duplicate) {
+                        uniqueMemories.push(item);
                     }
                 }
-                if (!duplicate) {
-                    uniqueMemories.push(item);
-                }
-            }
 
-            if (uniqueMemories.length !== memories.length) {
-                console.log(`[MemoryService] Cleaned up ${memories.length - uniqueMemories.length} duplicate long-term memories.`);
-                await this.repository.writeMemories(userId, uniqueMemories);
-            }
+                if (uniqueMemories.length !== memories.length) {
+                    console.log(`[MemoryService] Cleaned up ${memories.length - uniqueMemories.length} duplicate long-term memories.`);
+                    await this.repository.writeMemories(userId, uniqueMemories);
+                }
+            });
         } catch (error) {
             console.error("[MemoryService] Memory cleanup failed:", error);
         }

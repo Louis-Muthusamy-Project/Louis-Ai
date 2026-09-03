@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { App as AntApp } from "antd";
 
 import SocketService from "../services/socketService";
+import VoiceService from "../services/voiceService";
 import CharacterStateMachine from "../core/CharacterStateMachine";
 import EmotionEngine from "../core/EmotionEngine";
 import useChatStore from "../store/chatStore";
@@ -38,6 +39,8 @@ export default function ChatProvider({ children }) {
             });
 
             CharacterStateMachine.idle();
+
+            VoiceService.stop();
 
         };
 
@@ -126,6 +129,53 @@ export default function ChatProvider({ children }) {
 
         };
 
+        // data.audio is a playable "data:audio/mpeg;base64,..." URI generated
+        // fully in-memory on the backend (see EdgeTTSProvider/voiceService) -
+        // no server temp files, no extra fetch needed. AudioQueue (behind
+        // VoiceService) already drives Live2D speaking/lip-sync from this.
+        const onVoiceAudio = (data) => {
+
+            if (!data || !data.audio) return;
+
+            VoiceService.speak(data.audio);
+
+        };
+
+        const onVoiceError = (err) => {
+
+            console.warn("[ChatProvider] Voice synthesis failed:", err && err.error);
+
+        };
+
+        // Correlates by "the currently-loading image message", since
+        // ImageGenerationCapability only allows one in-flight generation
+        // per user at a time (see server-side duplicate-request guard) -
+        // there's at most one candidate to update.
+        const findLoadingImageMessageId = () => {
+            const messages = useChatStore.getState().messages;
+            const found = [...messages].reverse().find(m => m.image && m.image.status === "loading");
+            return found ? found.id : null;
+        };
+
+        const onImageResult = (data) => {
+            const id = findLoadingImageMessageId();
+            if (!id) return;
+            useChatStore.getState().updateMessage(id, {
+                image: { status: "done", data: data.data, mimeType: data.mimeType, prompt: data.prompt }
+            });
+        };
+
+        const onImageError = (data) => {
+            const id = findLoadingImageMessageId();
+            if (!id) {
+                message.error(data?.message || "Image generation failed.");
+                return;
+            }
+            useChatStore.getState().updateMessage(id, {
+                image: { status: "error", prompt: data?.prompt, error: data?.message }
+            });
+        };
+
         SocketService.on("connect", onConnect);
 
         SocketService.on("disconnect", onDisconnect);
@@ -143,6 +193,14 @@ export default function ChatProvider({ children }) {
         SocketService.on("yuna:message:reply", onReply);
 
         SocketService.on("yuna:message:error", onError);
+
+        SocketService.on("yuna:voice:chunk", onVoiceAudio);
+
+        SocketService.on("yuna:voice:error", onVoiceError);
+
+        SocketService.on("yuna:image:result", onImageResult);
+
+        SocketService.on("yuna:image:error", onImageError);
 
         return () => {
 
@@ -163,6 +221,14 @@ export default function ChatProvider({ children }) {
             SocketService.off("yuna:message:reply", onReply);
 
             SocketService.off("yuna:message:error", onError);
+
+            SocketService.off("yuna:voice:chunk", onVoiceAudio);
+
+            SocketService.off("yuna:voice:error", onVoiceError);
+
+            SocketService.off("yuna:image:result", onImageResult);
+
+            SocketService.off("yuna:image:error", onImageError);
 
         };
 

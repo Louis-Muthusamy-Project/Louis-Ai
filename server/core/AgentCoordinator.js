@@ -115,8 +115,13 @@ class AgentCoordinator extends BaseAgent {
                 }
 
                 this.broadcast("task.started", { socketId, capability: step.capability });
+                // socketId here is the authenticated userId (see chatController.js/AIOrchestrator),
+                // never a client-supplied value. Capabilities that own per-user data (e.g. "schedule")
+                // read __ownerId to scope themselves - the AI's own plan args can never override it,
+                // since it's injected here rather than coming from step.args.
+                const scopedArgs = { ...(step.args || {}), __ownerId: socketId };
                 // Note: delegateTask should pass signal down to agents
-                const stepResult = await this.delegateTask(agentName, step.capability, step.args, signal);
+                const stepResult = await this.delegateTask(agentName, step.capability, scopedArgs, signal);
                 this.broadcast("task.completed", { socketId, capability: step.capability, result: stepResult });
                 
                 completedSteps.push({ capability: step.capability, result: stepResult });

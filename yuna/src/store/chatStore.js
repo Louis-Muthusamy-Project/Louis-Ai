@@ -56,6 +56,18 @@ const useChatStore = create((set) => ({
 
     },
 
+    updateMessage(id, patch) {
+
+        set(state => ({
+
+            messages: state.messages.map(m =>
+                m.id === id ? { ...m, ...patch } : m
+            )
+
+        }));
+
+    },
+
     clearMessages() {
 
         set({

@@ -17,6 +17,10 @@ const TTSService = require("./ttsService");
 // Bind default provider
 TTSService.setProvider(new EdgeTTSProvider());
 
+// Must match EdgeTTSProvider's configured OUTPUT_FORMAT (96kbps mono mp3),
+// used only to estimate real playback duration from actual audio byte size.
+const TTS_BITRATE_BPS = 96000;
+
 const SPEECH_STATES = Object.freeze({
     IDLE: "idle",
     GENERATING: "generating",
@@ -83,15 +87,24 @@ class VoiceService extends EventEmitter {
 
     /**
      * Enqueue a text reply. Splits into sentences for streaming speech.
+     * @param {string} text
+     * @param {string} ownerId - authenticated user this speech belongs to;
+     *   required so the socket bridge only ever delivers audio to the
+     *   right user (see socketHandler.js).
      */
-    enqueue(text) {
+    enqueue(text, ownerId) {
         if (!text || !text.trim()) return;
+        if (!ownerId) {
+            console.warn("[VoiceService] enqueue() called without an ownerId - dropping (cannot route audio safely).");
+            return;
+        }
 
         // Split by sentence markers for smooth streaming speech segments
         const segments = text.split(/(?<=[.!?])\s+/).filter(s => s.trim().length > 0);
         for (const segment of segments) {
             this.queue.push({
                 text: segment,
+                ownerId,
                 timestamp: Date.now()
             });
         }
@@ -104,16 +117,18 @@ class VoiceService extends EventEmitter {
         }
     }
 
-    async speak(text) {
+    async speak(segment) {
+        const { text, ownerId } = segment;
         if (this.currentState === SPEECH_STATES.INTERRUPTED) return;
         
         this.currentText = text;
+        this._currentOwnerId = ownerId;
         this._transitionTo(SPEECH_STATES.GENERATING);
 
-        this.emit("voice:start", { text });
+        this.emit("voice:start", { text, ownerId });
 
         try {
-            // Synthesize audio
+            // Synthesize audio - fully in memory, no temp files (see EdgeTTSProvider)
             const audioData = await TTSService.synthesize({ text });
             
             if (this.currentState === SPEECH_STATES.INTERRUPTED) return;
@@ -122,23 +137,32 @@ class VoiceService extends EventEmitter {
             // Compute accurate lip sync (viseme) timings
             const visemes = this.calculateLipSync(text);
 
+            // Base64 data URI - playable directly by an <audio> element on the
+            // frontend with zero backend disk I/O and no static file route needed.
+            const audioDataUri = `data:${audioData.mimeType};base64,${audioData.audio.toString("base64")}`;
+
             this.emit("voice:audio", {
                 text,
-                audio: audioData,
+                ownerId,
+                audio: audioDataUri,
+                voice: audioData.voice,
                 visemes // Lip sync mouth shapes array with timestamps
             });
 
-            // Simulate playback delay matching text length (120ms per character)
-            const duration = Math.max(800, text.length * 110);
+            // Real duration estimated from the actual audio byte size and the
+            // fixed output bitrate (96kbps mono, see EdgeTTSProvider), not a
+            // guess based on text length.
+            const estimatedMs = (audioData.audio.length * 8 / TTS_BITRATE_BPS) * 1000;
+            const duration = Math.max(300, estimatedMs);
             await this.delay(duration);
 
             if (this.currentState === SPEECH_STATES.SPEAKING) {
-                this.emit("voice:end", { text });
+                this.emit("voice:end", { text, ownerId });
                 this._transitionTo(SPEECH_STATES.IDLE);
             }
         } catch (error) {
             console.error("[VoiceService] Synthesis failed:", error);
-            this.emit("voice:error", { error: error.message, text });
+            this.emit("voice:error", { error: error.message, text, ownerId });
             this._transitionTo(SPEECH_STATES.IDLE);
         } finally {
             this.currentText = "";
@@ -151,7 +175,7 @@ class VoiceService extends EventEmitter {
                 break;
             }
             const segment = this.queue.shift();
-            await this.speak(segment.text);
+            await this.speak(segment);
         }
         if (this.currentState !== SPEECH_STATES.INTERRUPTED) {
             this._transitionTo(SPEECH_STATES.IDLE);
@@ -179,6 +203,42 @@ class VoiceService extends EventEmitter {
 
     clearQueue() {
         this.queue = [];
+    }
+
+    /**
+     * Cancels only this user's pending/playing speech. voiceService is a
+     * single shared queue/state-machine across all connected users (a
+     * pre-existing architectural limitation, not something rearchitected
+     * here - see project notes), so this can only remove THIS user's
+     * still-queued segments outright, and additionally interrupts the
+     * currently-playing segment only if it also belongs to this user.
+     * It deliberately does NOT call stop() (which would silence every
+     * user), so a genuinely concurrent different user's speech is left
+     * alone.
+     */
+    cancelForUser(ownerId) {
+        if (!ownerId) return;
+
+        const hadQueued = this.queue.some(seg => seg.ownerId === ownerId);
+        this.queue = this.queue.filter(seg => seg.ownerId !== ownerId);
+
+        const isThisUserCurrentlySpeaking =
+            (this.currentState === SPEECH_STATES.SPEAKING || this.currentState === SPEECH_STATES.GENERATING) &&
+            this._currentOwnerId === ownerId;
+
+        if (isThisUserCurrentlySpeaking) {
+            this.currentText = "";
+            this._transitionTo(SPEECH_STATES.INTERRUPTED);
+            this.emit("voice:stop", { ownerId });
+            this.emit("voice:interrupted", { ownerId });
+            setTimeout(() => {
+                if (this.currentState === SPEECH_STATES.INTERRUPTED) {
+                    this._transitionTo(SPEECH_STATES.IDLE);
+                }
+            }, 300);
+        } else if (hadQueued) {
+            this.emit("voice:stop", { ownerId });
+        }
     }
 
     // ── Cognitive Audio Analysis Utilities ──────────────────────────────────

@@ -19,28 +19,33 @@ class PlannerAgent extends BaseAgent {
                     const text = params.text;
                     const detectionResult = await intentDetector.detect(text);
                     
-                    if (detectionResult.intent === "CHAT") {
+                    if (!detectionResult.requiresTool || detectionResult.intent === "conversation" || detectionResult.intent === "question") {
                         // Direct reply, no tools needed
                         this.broadcast("agent:task:complete", {
                             taskId,
-                            result: { directReply: true, intent: "CHAT" }
+                            result: { directReply: true, intent: detectionResult.intent }
                         });
                         return;
                     }
 
-                    const plan = taskPlanner.plan(detectionResult);
-                    
-                    // Transform old tool-based plan to new agent-based plan
-                    // For now, map all tools to ExecutorAgent except specific ones
+                    // NOTE: taskPlanner.plan(context, detectionResult) is async and
+                    // returns { steps: [{ capability, args }] } - this previously
+                    // called plan(detectionResult) (wrong arg count, not awaited)
+                    // and then read step.tool (the field is actually step.capability),
+                    // meaning this whole non-conversational path always threw before
+                    // reaching any agent/capability. Both are fixed here.
+                    const plan = await taskPlanner.plan({}, detectionResult);
+
                     const agentSteps = plan.steps.map(step => {
                         let agent = "Executor";
-                        if (step.tool === "coding") agent = "Coding";
-                        if (step.tool === "browser") agent = "Browser";
-                        if (step.tool === "schedule") agent = "Automation";
+                        if (step.capability?.startsWith("coding")) agent = "Coding";
+                        if (step.capability?.startsWith("browser")) agent = "Browser";
+                        if (step.capability?.startsWith("schedule")) agent = "Automation";
+                        if (step.capability?.startsWith("image")) agent = "Automation";
 
                         return {
                             agent,
-                            action: step.tool,
+                            action: step.capability,
                             params: step.args
                         };
                     });

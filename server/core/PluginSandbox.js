@@ -3,6 +3,47 @@ const path = require("path");
 
 /**
  * ==========================================
+ * ScopedKernelFacade
+ * ------------------------------------------
+ * Previously every plugin received the raw, live Kernel DI container
+ * (context.kernel = this.kernel), meaning ANY plugin - regardless of
+ * its declared manifest scopes - could do kernel.get("userRepository")
+ * or any other registered service, completely bypassing the `apis`
+ * scoping below. This facade keeps the same shape plugins already use
+ * (`this.kernel.get(name)`, per PluginSDK.js) but only allows lookups
+ * the plugin's declared scopes actually cover.
+ * ==========================================
+ */
+class ScopedKernelFacade {
+    constructor(kernel, scopes, manifest) {
+        this._kernel = kernel;
+        this._scopes = new Set(scopes || []);
+        this._manifest = manifest;
+    }
+
+    get(serviceName) {
+        const permitted = Object.entries(ScopedKernelFacade.ALLOWED_BY_SCOPE).some(
+            ([scope, services]) => this._scopes.has(scope) && services.includes(serviceName)
+        );
+        if (!permitted) {
+            throw new Error(
+                `Plugin ${this._manifest.name} attempted kernel.get("${serviceName}") without a declared scope that permits it.`
+            );
+        }
+        return this._kernel.get(serviceName);
+    }
+}
+
+// scope -> the only kernel service names that scope unlocks.
+ScopedKernelFacade.ALLOWED_BY_SCOPE = {
+    memory: ["memoryService"],
+    schedule: ["scheduleService"],
+    settings: ["settingsService"],
+    events: ["eventBus"]
+};
+
+/**
+ * ==========================================
  * PluginSandbox - Scoped Context Isolation
  * ==========================================
  * Wraps plugin execution inside a Node VM to control 
@@ -47,7 +88,7 @@ class PluginSandbox {
             error: (message) => console.error(`[Plugin:${manifest.name}] ${message}`)
         };
 
-        // Inject Kernel resources (we could restrict this further based on scopes)
+        // Inject Kernel resources - each gated behind its own declared scope.
         if (scopes.includes("events")) {
             apis.eventBus = this.kernel.get("eventBus");
         }
@@ -60,8 +101,23 @@ class PluginSandbox {
             apis.memoryService = this.kernel.get("memoryService");
         }
 
+        if (scopes.includes("schedule")) {
+            apis.scheduleService = this.kernel.get("scheduleService");
+        }
+
+        if (scopes.includes("browser")) {
+            apis.browserCapability = this.kernel.get("capabilityRegistry").get("browser");
+        }
+
+        if (scopes.includes("coding")) {
+            apis.codingCapability = this.kernel.get("capabilityRegistry").get("coding");
+        }
+
         sandbox.context = {
-            kernel: this.kernel,
+            // A scoped facade, NOT the raw Kernel - see ScopedKernelFacade above.
+            // Plugins keep the same this.kernel.get(name) shape (PluginSDK.js),
+            // but lookups outside their declared scopes now throw.
+            kernel: new ScopedKernelFacade(this.kernel, scopes, manifest),
             manifest,
             apis
         };
@@ -70,27 +126,64 @@ class PluginSandbox {
     }
 
     _createScopedRequire(scopes, manifest) {
-        return (moduleName) => {
-            // Built-in node modules scope restrictions
-            if (moduleName === "fs" && !scopes.includes("fs")) {
-                throw new Error(`Plugin ${manifest.name} attempted to require 'fs' without the 'fs' scope.`);
-            }
-            if (moduleName === "child_process" && !scopes.includes("child_process")) {
-                throw new Error(`Plugin ${manifest.name} attempted to require 'child_process' without the 'child_process' scope.`);
-            }
-            if (moduleName === "net" && !scopes.includes("network")) {
-                throw new Error(`Plugin ${manifest.name} attempted to require 'net' without the 'network' scope.`);
-            }
+        // Previously this only blocked the literal strings "fs",
+        // "child_process", and "net" - everything else, including a
+        // "node:fs" prefix (which bypasses the literal-string check
+        // entirely) or any third-party package already installed in
+        // server/node_modules (puppeteer, mongoose, axios, ...), fell
+        // through to the real, unrestricted require(). That made the
+        // "scopes" system decorative for require access. This replaces
+        // it with an allowlist: safe built-ins are always available,
+        // risk-bearing built-ins require their scope, and everything
+        // else (arbitrary npm packages) is rejected outright rather
+        // than silently permitted.
+        const ALWAYS_ALLOWED = new Set([
+            "path", "url", "querystring", "util", "events",
+            "crypto", "assert", "buffer", "string_decoder"
+        ]);
 
-            // Also allow the plugin to require the SDK
-            if (moduleName === "@yuna/sdk") {
+        const SCOPE_GATED = {
+            fs: "fs",
+            child_process: "child_process",
+            net: "network",
+            http: "network",
+            https: "network",
+            dgram: "network",
+            dns: "network",
+            tls: "network",
+            os: "system",
+            vm: "system",
+            module: "system",
+            worker_threads: "system"
+        };
+
+        return (moduleName) => {
+            // Normalize "node:fs" -> "fs" so the node: prefix can't be used
+            // to bypass the checks below.
+            const normalized = moduleName.replace(/^node:/, "");
+
+            if (normalized === "@yuna/sdk" || moduleName === "@yuna/sdk") {
                 return require("../plugins/PluginSDK");
             }
 
-            // Normal require (for safe node modules or plugin local files)
-            // Note: A true robust sandbox would map this to the plugin's local directory only.
-            // For this implementation, we fallback to standard require.
-            return require(moduleName);
+            if (ALWAYS_ALLOWED.has(normalized)) {
+                return require(normalized);
+            }
+
+            const requiredScope = SCOPE_GATED[normalized];
+            if (requiredScope) {
+                if (!scopes.includes(requiredScope)) {
+                    throw new Error(`Plugin ${manifest.name} attempted to require '${normalized}' without the '${requiredScope}' scope.`);
+                }
+                return require(normalized);
+            }
+
+            // Not an allowlisted built-in and not an explicitly scoped one -
+            // this covers both unknown Node built-ins and any third-party
+            // package (npm dependency) reachable from server/node_modules.
+            // Plugins get functionality through the `apis` object (scoped
+            // per manifest), not by requiring arbitrary packages.
+            throw new Error(`Plugin ${manifest.name} attempted to require '${moduleName}', which is not permitted. Use the scoped apis object instead.`);
         };
     }
 
