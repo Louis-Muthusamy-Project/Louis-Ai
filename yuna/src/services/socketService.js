@@ -108,6 +108,42 @@ class SocketService {
 
     }
 
+    /**
+     * For request/response style events that expect a server ack callback
+     * (see server/socket/socketHandler.js's CODING_CAPABILITY_ACTION),
+     * rather than the fire-and-forget emit() above whose responses arrive
+     * as separate later events. Resolves with whatever the server passed
+     * to its ack callback, or a clean { success: false } if there's no
+     * live connection or the server takes too long to respond - callers
+     * never hang forever waiting on a dropped connection.
+     */
+    emitWithAck(event, payload = {}, timeoutMs = 15000) {
+
+        if (!this.socket) {
+            return Promise.resolve({ success: false, message: "Not connected." });
+        }
+
+        return new Promise((resolve) => {
+
+            let settled = false;
+
+            const timer = setTimeout(() => {
+                if (settled) return;
+                settled = true;
+                resolve({ success: false, message: "Request timed out." });
+            }, timeoutMs);
+
+            this.socket.emit(event, payload, (response) => {
+                if (settled) return;
+                settled = true;
+                clearTimeout(timer);
+                resolve(response);
+            });
+
+        });
+
+    }
+
     on(event, callback) {
 
         if (!this.listeners[event]) {

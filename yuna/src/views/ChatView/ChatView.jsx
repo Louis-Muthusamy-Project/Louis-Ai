@@ -1,15 +1,10 @@
 import React from "react";
 
-import DesktopTitleBar from "../../components/Desktop/DesktopTitleBar";
-import "../../components/Desktop/DesktopTitleBar.css";
-
 import ChatHeader from "../../components/Chat/ChatHeader";
 import ChatMessages from "../../components/Chat/ChatMessages";
 import ChatComposer from "../../components/Chat/ChatComposer";
 
 import CharacterPanel from "../../components/CharacterPanel/CharacterPanel";
-
-import RightDrawer from "../../components/Layout/RightDrawer";
 
 import useChatStore from "../../store/chatStore";
 
@@ -33,8 +28,6 @@ export default function ChatView() {
 
         <div className={styles.appRoot}>
 
-            <DesktopTitleBar />
-
             <ChatHeader />
 
             <div className={styles.mainSplit}>
@@ -56,8 +49,6 @@ export default function ChatView() {
                 </div>
 
             </div>
-
-            <RightDrawer />
 
         </div>
 

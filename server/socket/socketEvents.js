@@ -1,11 +1,4 @@
-/**
- * ==========================================
- * Yuna Socket Events
- * ------------------------------------------
- * Single source of truth for every
- * Socket.IO event used by frontend/backend.
- * ==========================================
- */
+
 
 const SocketEvents = Object.freeze({
 
@@ -70,6 +63,34 @@ const SocketEvents = Object.freeze({
     IMAGE_RESULT: "yuna:image:result",
 
     IMAGE_ERROR: "yuna:image:error",
+
+    /**
+     * Coding Agent
+     */
+
+    CODING_SESSION_START: "yuna:coding:session:start",
+
+    CODING_AGENT_THINKING: "yuna:coding:agent:thinking",
+
+    CODING_TOOL_START: "yuna:coding:tool:start",
+
+    CODING_TOOL_RESULT: "yuna:coding:tool:result",
+
+    CODING_FILE_CHANGED: "yuna:coding:file:changed",
+
+    CODING_TERMINAL_START: "yuna:coding:terminal:start",
+
+    CODING_TERMINAL_OUTPUT: "yuna:coding:terminal:output",
+
+    CODING_TERMINAL_COMPLETE: "yuna:coding:terminal:complete",
+
+    CODING_APPROVAL_REQUIRED: "yuna:coding:approval:required",
+
+    CODING_AGENT_COMPLETE: "yuna:coding:agent:complete",
+
+    CODING_AGENT_ERROR: "yuna:coding:agent:error",
+
+    CODING_AGENT_CANCELLED: "yuna:coding:agent:cancelled",
 
     /**
      * Character

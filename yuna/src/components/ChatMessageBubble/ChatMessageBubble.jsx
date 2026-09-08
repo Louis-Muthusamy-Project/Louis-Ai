@@ -1,11 +1,28 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Spin, Button } from 'antd';
-import { ReloadOutlined } from '@ant-design/icons';
+import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import styles from './chatMessageBubble.module.css';
 
 import SocketService from '../../services/socketService';
 import useChatStore from '../../store/chatStore';
+
+function downloadGeneratedImage(image) {
+  const mimeType = image.mimeType || 'image/png';
+  const extension = mimeType.split('/')[1] || 'png';
+  const slug = (image.prompt || 'yuna-image')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 40) || 'yuna-image';
+
+  const link = document.createElement('a');
+  link.href = `data:${mimeType};base64,${image.data}`;
+  link.download = `${slug}-${Date.now()}.${extension}`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
 
 function ImagePayload({ message }) {
   const image = message.image;
@@ -42,13 +59,21 @@ function ImagePayload({ message }) {
 
   // status === 'done'
   return (
-    // Inline base64 data URI - the server never writes this to disk or
-    // sends a filesystem path, so there's nothing to fetch separately.
-    <img
-      className={styles.generatedImage}
-      src={`data:${image.mimeType};base64,${image.data}`}
-      alt={image.prompt || 'Generated image'}
-    />
+    <div className={styles.generatedImageWrap}>
+      <img
+        className={styles.generatedImage}
+        src={`data:${image.mimeType};base64,${image.data}`}
+        alt={image.prompt || 'Generated image'}
+      />
+      <Button
+        size="small"
+        icon={<DownloadOutlined />}
+        className={styles.imageDownloadButton}
+        onClick={() => downloadGeneratedImage(image)}
+      >
+        Download
+      </Button>
+    </div>
   );
 }
 

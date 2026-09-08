@@ -157,6 +157,18 @@ export default function ChatProvider({ children }) {
             return found ? found.id : null;
         };
 
+       
+        const onImageStart = (data) => {
+            if (findLoadingImageMessageId()) return;
+            useChatStore.getState().addMessage({
+                id: crypto.randomUUID(),
+                role: "assistant",
+                text: "",
+                image: { status: "loading", prompt: data?.prompt },
+                createdAt: new Date().toISOString()
+            });
+        };
+
         const onImageResult = (data) => {
             const id = findLoadingImageMessageId();
             if (!id) return;
@@ -198,6 +210,8 @@ export default function ChatProvider({ children }) {
 
         SocketService.on("yuna:voice:error", onVoiceError);
 
+        SocketService.on("yuna:image:start", onImageStart);
+
         SocketService.on("yuna:image:result", onImageResult);
 
         SocketService.on("yuna:image:error", onImageError);
@@ -225,6 +239,8 @@ export default function ChatProvider({ children }) {
             SocketService.off("yuna:voice:chunk", onVoiceAudio);
 
             SocketService.off("yuna:voice:error", onVoiceError);
+
+            SocketService.off("yuna:image:start", onImageStart);
 
             SocketService.off("yuna:image:result", onImageResult);
 

@@ -1,0 +1,107 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #17171c;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.changesTab {
+  padding: 8px;
+  overflow-y: auto;
+  max-height: 320px;
+}
+
+.group {
+  margin-bottom: 10px;
+}
+
+.groupTitle {
+  font-size: 11px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.45);
+  margin-bottom: 4px;
+}
+
+.fileRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 0 !important;
+}
+
+.filePath {
+  flex: 1;
+  font-size: 12.5px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filePath:hover {
+  text-decoration: underline;
+}
+
+.diffView {
+  margin: 10px 0;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.diffHeader {
+  padding: 6px 8px;
+  font-size: 12px;
+  background: rgba(255,255,255,0.04);
+}
+
+.diffPre {
+  margin: 0;
+  padding: 6px 8px;
+  font-size: 12px;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.diffAdd { color: #10b981; }
+.diffRemove { color: #dc2626; }
+.diffContext { color: rgba(255,255,255,0.6); }
+
+.commitArea {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.logEntry {
+  width: 100%;
+}
+
+.logSubject {
+  font-size: 12.5px;
+}
+
+.logMeta {
+  font-size: 11px;
+  color: rgba(255,255,255,0.45);
+}
+
+.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #17171c;
+}

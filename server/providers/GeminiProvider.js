@@ -2,11 +2,6 @@ const { GoogleGenAI } = require("@google/genai");
 const BaseAIProvider = require("./BaseAIProvider");
 const geminiConfig = require("../config/gemini");
 
-/**
- * ==========================================
- * GeminiProvider - Strategy Class
- * ==========================================
- */
 class GeminiProvider extends BaseAIProvider {
     constructor(kernel) {
         super();
@@ -108,19 +103,7 @@ class GeminiProvider extends BaseAIProvider {
     }
 
     /**
-     * Generates an image from a text prompt using the configured
-     * image-capable Gemini model (see config/gemini.js: imageModel).
-     * Uses the SAME generateContent() call shape as normal text
-     * generation - just with responseModalities including "IMAGE" and a
-     * different model - so this doesn't require a second SDK client or
-     * separate auth. Confirmed against the installed @google/genai
-     * version's type definitions (generateContent's config accepts
-     * responseModalities and its response parts can contain inlineData);
-     * NOT verified against a live API call, since this sandbox has no
-     * network access to Google's endpoints. Whether the configured
-     * GEMINI_API_KEY actually has this model enabled needs a real request
-     * in an environment with network access.
-     *
+
      * @param {string} prompt
      * @returns {Promise<{data: string, mimeType: string}>} base64 image data - never written to disk
      */
@@ -156,6 +139,53 @@ class GeminiProvider extends BaseAIProvider {
         } catch (error) {
             console.error("[GeminiProvider] Image generation failed:", error.message);
             throw new Error("Unable to generate image.");
+        }
+    }
+
+    /**
+
+     * @param {Array} contents
+     * @param {Array<{name:string, description:string, parameters:object}>} tools
+     * @param {{mode?: "AUTO"|"ANY"|"NONE"}} [toolConfig]
+     */
+    async generateWithTools(contents, tools, toolConfig = {}) {
+        const { FunctionCallingConfigMode } = require("@google/genai");
+
+        const functionDeclarations = tools.map((tool) => ({
+            name: tool.name,
+            description: tool.description,
+            parametersJsonSchema: tool.parameters
+        }));
+
+        const modeMap = {
+            AUTO: FunctionCallingConfigMode.AUTO,
+            ANY: FunctionCallingConfigMode.ANY,
+            NONE: FunctionCallingConfigMode.NONE
+        };
+
+        try {
+            const response = await this.client.models.generateContent({
+                model: this.model,
+                contents,
+                config: {
+                    ...geminiConfig.generationConfig,
+                    tools: [{ functionDeclarations }],
+                    toolConfig: {
+                        functionCallingConfig: {
+                            mode: modeMap[toolConfig.mode] || FunctionCallingConfigMode.AUTO
+                        }
+                    }
+                }
+            });
+
+            if (!response) {
+                throw new Error("Gemini returned no response.");
+            }
+
+            return response;
+        } catch (error) {
+            console.error("[GeminiProvider] generateWithTools failed:", error);
+            throw new Error(`Gemini tool-calling request failed: ${error.message}`);
         }
     }
 

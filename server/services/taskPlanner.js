@@ -1,8 +1,3 @@
-/**
- * ==========================================
- * TaskPlanner - Sequencer for multi-step tasks
- * ==========================================
- */
 class TaskPlanner {
     constructor(kernel) {
         this.kernel = kernel;
@@ -26,30 +21,10 @@ class TaskPlanner {
             return { steps: [] };
         }
 
-        // Fast-path "what time is it" - previously routed to a
-        // "system.time" capability that was never actually registered
-        // (no SystemCapability exists), which would have failed capability
-        // lookup downstream. Gemini can answer this conversationally
-        // without a tool call at all, so this is now treated the same as
-        // "no tool needed" rather than pointing at a nonexistent capability.
         if (intent === "system" && parameters.command === "time") {
             return { steps: [] };
         }
 
-        // For complex intents, ask LLM to map to specific capabilities.
-        // IMPORTANT: these capability id strings must match
-        // CapabilityRegistry's actual registered ids exactly (see
-        // server/capabilities/*Capability.js constructors) - a prior
-        // version of this prompt used dotted namespaced names like
-        // "browser.navigate"/"coding.readFile"/"memory.store" that don't
-        // match any registered id ("browser"/"coding"/"schedule"/"image"),
-        // so capabilityRegistry.get(step.capability) would always return
-        // undefined downstream. "memory" and "desktop" are deliberately
-        // NOT offered here: MemoryCapability has no real plan-driven
-        // actions (memory is saved automatically per chat turn), and no
-        // "system"/desktop-launch capability is registered at all -
-        // advertising either would just produce another dead capability
-        // call.
         const systemPrompt = `You are Yuna's Task Planner.
 Map the user's intent to a sequence of capabilities.
 
@@ -64,6 +39,10 @@ You may ONLY use these exact capability id strings - nothing else exists:
   Example: {"action":"setReminder","params":{"dateString":"2026-01-01T10:00:00.000Z","message":"Call mom"}}
   Example: {"action":"setTimer","params":{"durationInSeconds":300,"message":"Check the oven"}}
 - "image": generates an image from a text prompt. args: {"action":"generate","params":{"prompt":"<image description>"}}
+- "codingWorkspace": file/terminal/git tools scoped to the user's configured coding workspace (see Settings). args: {"action": "workspace.inspect"|"workspace.list"|"workspace.search"|"file.read"|"file.write"|"file.create"|"file.delete"|"file.rename"|"terminal.run"|"git.status"|"git.diff"|"git.log"|"git.stage"|"git.commit"|"git.branch", "params": {...}}
+  Example: {"action":"file.read","params":{"path":"src/App.jsx"}}
+  Example: {"action":"terminal.run","params":{"command":"npm test"}}
+  Note: this is for quick one-off requests typed in normal Chat (e.g. "read my package.json"). Multi-step coding tasks go through the dedicated Coding panel's agent loop, not this planner.
 
 Intent: ${intent}
 Parameters: ${JSON.stringify(parameters)}

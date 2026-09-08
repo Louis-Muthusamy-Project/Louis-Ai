@@ -11,6 +11,9 @@ const FileMemoryRepository = require("./infrastructure/FileMemoryRepository");
 const MongoMemoryRepository = require("./infrastructure/MongoMemoryRepository");
 const FileUserRepository = require("./infrastructure/FileUserRepository");
 const MongoUserRepository = require("./infrastructure/MongoUserRepository");
+const FileCodingSessionRepository = require("./infrastructure/FileCodingSessionRepository");
+const MongoCodingSessionRepository = require("./infrastructure/MongoCodingSessionRepository");
+const CodingSessionService = require("./services/coding/CodingSessionService");
 const ProviderManager = require("./providers/ProviderManager");
 
 const { AuthService } = require("./services/authService");
@@ -53,6 +56,9 @@ function registerBindings() {
 
     const userRepository = useMongo ? new MongoUserRepository() : new FileUserRepository();
     Kernel.register("userRepository", userRepository);
+
+    const codingSessionRepository = useMongo ? new MongoCodingSessionRepository() : new FileCodingSessionRepository();
+    Kernel.register("codingSessionService", new CodingSessionService(codingSessionRepository));
 
     // Providers
     Kernel.register("providerManager", ProviderManager);

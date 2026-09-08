@@ -19,12 +19,6 @@ class CodingCapability extends BaseCapability {
         this.providerManager = kernel.get("providerManager");
     }
 
-    /**
-     * Entry point used by the agent/plan pipeline. Previously this was a
-     * stub that always returned {success:true} without doing anything -
-     * runCommand/reviewCode/etc below were fully implemented but never
-     * reachable from here.
-     */
     async execute(input = {}) {
         const { action, params = {} } = input;
 
@@ -46,7 +40,6 @@ class CodingCapability extends BaseCapability {
         }
     }
 
-    // 1. Terminal / Git / Run Project
     async runCommand(command, cwd = this.projectRoot) {
         const PermissionService = require("../services/permissionService");
         if (!PermissionService.check("execute_shell")) {

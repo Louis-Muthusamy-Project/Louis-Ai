@@ -3,10 +3,13 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import { Spin } from 'antd';
 
 import ChatView from './views/ChatView/ChatView';
+import CharacterView from './views/CharacterView/CharacterView';
+import CodingView from './views/CodingView/CodingView';
 import LoginView from './views/Auth/LoginView/LoginView';
 import SignupView from './views/Auth/SignupView/SignupView';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import PublicOnlyRoute from './components/Auth/PublicOnlyRoute';
+import AppShell from './components/Layout/AppShell';
 import useAuthStore from './store/authStore';
 import { palette } from './theme/yunaTheme';
 
@@ -43,13 +46,17 @@ export default function App() {
       <Route path="/signup" element={<PublicOnlyRoute><SignupView /></PublicOnlyRoute>} />
 
       <Route
-        path="/chat"
         element={
           <ProtectedRoute>
-            <ChatView />
+            <AppShell />
           </ProtectedRoute>
         }
-      />
+      >
+        {/* Exactly 3 primary tabs - see components/Layout/MainNav.jsx */}
+        <Route path="/chat" element={<ChatView />} />
+        <Route path="/character" element={<CharacterView />} />
+        <Route path="/coding" element={<CodingView />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

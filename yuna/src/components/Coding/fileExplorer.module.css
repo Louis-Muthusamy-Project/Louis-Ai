@@ -1,0 +1,63 @@
+.explorer {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #17171c;
+  border-right: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: rgba(255,255,255,0.5);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.tree {
+  flex: 1;
+  overflow: auto;
+  background: transparent;
+  padding: 4px;
+}
+
+.itemLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.secretIcon {
+  color: #f59e0b;
+  font-size: 11px;
+}
+
+.errorLabel {
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.emptyState {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  background: #17171c;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.inlineInput {
+  padding: 4px 10px;
+}
