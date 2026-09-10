@@ -4,8 +4,8 @@ import { AudioOutlined, SendOutlined, PictureOutlined, StopOutlined } from "@ant
 import { motion } from "framer-motion";
 
 import SocketService from "../../services/socketService";
-import MicrophoneService from "../../services/microphoneService";
 import VoiceService from "../../services/voiceService";
+import useSpeechRecognition from "../../hooks/useSpeechRecognition";
 
 import useChatStore from "../../store/chatStore";
 
@@ -14,7 +14,7 @@ import styles from "./chatComposer.module.css";
 export default function ChatComposer() {
 
     const [input, setInput] = useState("");
-    const [recording, setRecording] = useState(false);
+    const { supported: micSupported, listening: recording, start: startlistening, stop: stopListening } = useSpeechRecognition();
 
     const addMessage = useChatStore(state => state.addMessage);
     const connected = useChatStore(state => state.connected);
@@ -107,17 +107,25 @@ export default function ChatComposer() {
 
     }
 
-    async function toggleMic() {
+    function toggleMic() {
 
-        if (!recording) {
-            await MicrophoneService.start();
-            setRecording(true);
+        if (recording) {
+            stopListening();
             return;
         }
 
-        const audioBlob = await MicrophoneService.stop();
-        setRecording(false);
-        console.log(audioBlob);
+        if (!micSupported) {
+            return;
+        }
+
+        // Defaults to English here - Chat's composer is a single text
+        // field with no per-message language picker the way the Character
+        // tab's VoiceControls has one; the transcript lands in the input
+        // box for the user to review/edit before sending either way, so
+        // an imperfect language guess is never sent silently.
+        startlistening("en-US", (transcript) => {
+            setInput(prev => (prev ? `${prev} ${transcript}` : transcript));
+        });
 
     }
 

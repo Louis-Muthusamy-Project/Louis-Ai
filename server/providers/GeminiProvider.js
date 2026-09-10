@@ -2,6 +2,11 @@ const { GoogleGenAI } = require("@google/genai");
 const BaseAIProvider = require("./BaseAIProvider");
 const geminiConfig = require("../config/gemini");
 
+/**
+ * ==========================================
+ * GeminiProvider - Strategy Class
+ * ==========================================
+ */
 class GeminiProvider extends BaseAIProvider {
     constructor(kernel) {
         super();
@@ -103,7 +108,19 @@ class GeminiProvider extends BaseAIProvider {
     }
 
     /**
-
+     * Generates an image from a text prompt using the configured
+     * image-capable Gemini model (see config/gemini.js: imageModel).
+     * Uses the SAME generateContent() call shape as normal text
+     * generation - just with responseModalities including "IMAGE" and a
+     * different model - so this doesn't require a second SDK client or
+     * separate auth. Confirmed against the installed @google/genai
+     * version's type definitions (generateContent's config accepts
+     * responseModalities and its response parts can contain inlineData);
+     * NOT verified against a live API call, since this sandbox has no
+     * network access to Google's endpoints. Whether the configured
+     * GEMINI_API_KEY actually has this model enabled needs a real request
+     * in an environment with network access.
+     *
      * @param {string} prompt
      * @returns {Promise<{data: string, mimeType: string}>} base64 image data - never written to disk
      */
@@ -143,7 +160,29 @@ class GeminiProvider extends BaseAIProvider {
     }
 
     /**
-
+     * Native function/tool calling for the coding agent (see
+     * server/services/coding/GeminiCodingProvider.js). Reuses this same
+     * client/model rather than creating a second GoogleGenAI instance.
+     *
+     * `contents` is the full turn history (Content[] - some with role
+     * "model" containing functionCall parts, some with role "user"
+     * containing functionResponse parts, per Gemini's manual multi-turn
+     * function-calling convention). `tools` is an array of
+     * {name, description, parameters} (plain JSON Schema - see
+     * codingToolDefinitions.js), converted here to the SDK's
+     * `{functionDeclarations: [...]}` shape with `parametersJsonSchema`.
+     *
+     * Returns the raw SDK response so the caller can read both
+     * response.text and response.functionCalls (FunctionCall[]).
+     *
+     * NOTE ON VERIFICATION: this method's request/response shape is
+     * verified against @google/genai@2.10.0's shipped type definitions
+     * (FunctionDeclaration.parametersJsonSchema, FunctionCallingConfigMode,
+     * response.functionCalls) - it has NOT been exercised against a live
+     * Gemini API call, since this sandbox has no network access to
+     * Google's endpoints. Treat as structurally correct, not
+     * live-verified, until run with a real GEMINI_API_KEY.
+     *
      * @param {Array} contents
      * @param {Array<{name:string, description:string, parameters:object}>} tools
      * @param {{mode?: "AUTO"|"ANY"|"NONE"}} [toolConfig]
@@ -184,7 +223,7 @@ class GeminiProvider extends BaseAIProvider {
 
             return response;
         } catch (error) {
-            console.error("[GeminiProvider] generateWithTools failed:", error);
+            console.error("[GeminiProvider] generateWithTools failed:", error.message);
             throw new Error(`Gemini tool-calling request failed: ${error.message}`);
         }
     }

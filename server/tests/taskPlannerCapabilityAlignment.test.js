@@ -7,7 +7,7 @@ const registry = require("../core/CapabilityRegistry");
 // Ensure the real capabilities are registered (mirrors PluginLoader's
 // auto-discovery, done manually here since this test doesn't boot the
 // full app).
-for (const file of ["BrowserCapability", "CodingCapability", "MemoryCapability", "ScheduleCapability", "ImageGenerationCapability"]) {
+for (const file of ["BrowserCapability", "CodingCapability", "CodingWorkspaceCapability", "MemoryCapability", "ScheduleCapability", "ImageGenerationCapability"]) {
     const cap = require(`../capabilities/${file}`);
     if (!registry.get(cap.id)) registry.register(cap);
 }

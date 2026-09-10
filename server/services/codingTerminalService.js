@@ -2,6 +2,7 @@ const { spawn } = require("child_process");
 const crypto = require("crypto");
 
 const { CodingWorkspaceService, WorkspaceAccessError } = require("./codingWorkspaceService");
+const { scrubEnv } = require("./coding/envScrub");
 
 /**
  * ==========================================
@@ -90,7 +91,7 @@ class CodingTerminalService {
      * authorization/workspace/classification problems raised before the
      * process is even started.
      */
-    run(userId, command, { cwd = ".", timeoutMs = DEFAULT_TIMEOUT_MS, confirmed = false } = {}) {
+    run(userId, command, { cwd = ".", timeoutMs = DEFAULT_TIMEOUT_MS, confirmed = false, onStart } = {}) {
         if (!command || typeof command !== "string" || !command.trim()) {
             throw new TerminalCommandError("A command is required.", "INVALID_COMMAND");
         }
@@ -128,10 +129,13 @@ class CodingTerminalService {
                 // puts the shell in its own process group so we can kill
                 // the whole group via a negative PID in _kill().
                 detached: process.platform !== "win32",
-                env: this._scrubEnv(process.env)
+                env: scrubEnv(process.env)
             });
 
             this._running.set(runId, child);
+            if (typeof onStart === "function") {
+                try { onStart(runId); } catch { /* caller's callback, not our problem to crash on */ }
+            }
 
             let stdout = "";
             let stderr = "";
@@ -223,21 +227,6 @@ class CodingTerminalService {
         } catch {
             // Process may have already exited between the check and the kill.
         }
-    }
-
-    // Never leak the Yuna server's own AI provider keys / JWT secret into a
-    // child process the coding agent asked to run inside the user's
-    // workspace - only pass through a conservative allowlist of harmless
-    // environment basics a normal shell/npm command needs.
-    _scrubEnv(sourceEnv) {
-        const ALLOWLIST_PREFIXES = ["PATH", "HOME", "USERPROFILE", "APPDATA", "TEMP", "TMP", "SHELL", "LANG", "SYSTEMROOT", "WINDIR", "NODE_", "NPM_", "PNPM_", "YARN_"];
-        const scrubbed = {};
-        for (const [key, value] of Object.entries(sourceEnv)) {
-            if (ALLOWLIST_PREFIXES.some((prefix) => key.toUpperCase().startsWith(prefix))) {
-                scrubbed[key] = value;
-            }
-        }
-        return scrubbed;
     }
 }
 

@@ -1,6 +1,7 @@
 const { spawn } = require("child_process");
 
 const { CodingWorkspaceService, WorkspaceAccessError } = require("./codingWorkspaceService");
+const { scrubEnv } = require("./coding/envScrub");
 
 /**
  * ==========================================
@@ -21,7 +22,11 @@ const { CodingWorkspaceService, WorkspaceAccessError } = require("./codingWorksp
  * git can never be pointed outside the configured workspace. Arguments are
  * passed as argv arrays (spawn without shell:true) rather than building a
  * command string, so a commit message containing quotes/backticks can
- * never break out into shell interpretation.
+ * never break out into shell interpretation. The spawned process's
+ * environment is scrubbed (see coding/envScrub.js) so a git hook script
+ * planted in the workspace (e.g. .git/hooks/post-commit) cannot read
+ * Yuna's own server secrets (API keys, JWT_SECRET) via its inherited
+ * environment.
  * ==========================================
  */
 
@@ -42,7 +47,7 @@ class CodingGitService {
         const absCwd = CodingWorkspaceService.resolveSafe(userId, cwd);
 
         return new Promise((resolve, reject) => {
-            const child = spawn("git", args, { cwd: absCwd, windowsHide: true });
+            const child = spawn("git", args, { cwd: absCwd, windowsHide: true, env: scrubEnv(process.env) });
 
             let stdout = "";
             let stderr = "";

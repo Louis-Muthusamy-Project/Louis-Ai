@@ -1,5 +1,6 @@
 .root {
   flex: 1;
+  position: relative;
   display: flex;
   min-width: 0;
   min-height: 0;

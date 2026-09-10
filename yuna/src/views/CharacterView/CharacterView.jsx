@@ -1,6 +1,7 @@
 import React from "react";
 
 import CharacterPanel from "../../components/CharacterPanel/CharacterPanel";
+import VoiceControls from "../../components/Character/VoiceControls";
 
 import styles from "./characterView.module.css";
 
@@ -12,18 +13,15 @@ import styles from "./characterView.module.css";
  * (useVoice/useCharacterState/EmotionEngine), so it reacts to the same
  * live conversation state regardless of which tab it's rendered in.
  *
- * LIMITATION (documented, not hidden): this is a real reuse of the
- * existing character component, not a standalone voice-to-voice
- * interaction mode - no dedicated microphone/wake-word/voice-only
- * backend exists in this codebase to power a distinct "talk to Yuna by
- * voice, no text" experience. That was never built in any prior session
- * of this project; this tab surfaces what genuinely exists today rather
- * than fabricating a voice-mode UI with nothing behind it.
+ * VoiceControls adds the actual voice-to-voice input leg - see that
+ * component for how it reuses the existing text-chat pipeline (AI
+ * response, TTS, Live2D lip-sync) rather than reimplementing any of it.
  */
 export default function CharacterView() {
     return (
         <div className={styles.root}>
             <CharacterPanel />
+            <VoiceControls />
         </div>
     );
 }

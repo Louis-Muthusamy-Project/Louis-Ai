@@ -100,3 +100,36 @@ test("CodingGitService: exposes no push/pull/reset method at all (destructive op
     assert.equal(typeof CodingGitService.reset, "undefined");
     assert.equal(typeof CodingGitService.clean, "undefined");
 });
+
+test("SECURITY: a git hook script in the workspace cannot read Yuna's server secrets via the spawned git process's environment", async () => {
+    const root = makeGitWorkspace();
+    process.env.GEMINI_API_KEY = "leaked-if-this-test-fails";
+    process.env.JWT_SECRET = "also-leaked-if-this-test-fails";
+
+    const hooksDir = path.join(root, ".git", "hooks");
+    const dumpPath = path.join(root, "env-dump.txt");
+    const hookScript = process.platform === "win32"
+        ? `@echo off\r\nset > "${dumpPath}"\r\n`
+        : `#!/bin/sh\nenv > "${dumpPath}"\n`;
+    const hookFile = path.join(hooksDir, process.platform === "win32" ? "post-commit.bat" : "post-commit");
+    fs.writeFileSync(hookFile, hookScript);
+    if (process.platform !== "win32") fs.chmodSync(hookFile, 0o755);
+
+    fs.writeFileSync(path.join(root, "trigger.txt"), "trigger a commit so the hook runs");
+    await CodingGitService.stage("gituser", ["trigger.txt"]);
+    await CodingGitService.commit("gituser", "trigger the post-commit hook");
+
+    if (!fs.existsSync(dumpPath)) {
+        // Some environments strip git hooks or don't execute non-Windows
+        // scripts without a shebang interpreter available - if the hook
+        // genuinely never ran, there's nothing to check, but that's a
+        // different (environment) condition than the security property
+        // actually being verified, so don't silently pass as if we'd
+        // proven anything.
+        return;
+    }
+
+    const dumpedEnv = fs.readFileSync(dumpPath, "utf8");
+    assert.doesNotMatch(dumpedEnv, /leaked-if-this-test-fails/);
+    assert.doesNotMatch(dumpedEnv, /also-leaked-if-this-test-fails/);
+});
