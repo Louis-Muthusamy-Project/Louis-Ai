@@ -227,6 +227,26 @@ class ScheduleService {
     }
 
     /** Cancels a task only if it belongs to the calling owner; otherwise a silent no-op (never reveals whether the id exists for someone else). */
+    /**
+     * Cancels every in-memory job owned by this user and removes their
+     * per-user schedule.json - used by the Super Admin "delete account"
+     * flow (admin.controller.js).
+     */
+    async deleteAllForUser(ownerId) {
+        this._requireOwnerId(ownerId);
+        for (const [taskId, task] of this.tasks) {
+            if (task.ownerId !== ownerId) continue;
+            const job = this.jobs.get(taskId);
+            if (job) job.cancel();
+            this.jobs.delete(taskId);
+            this.tasks.delete(taskId);
+        }
+        const dir = this._userDir(ownerId);
+        if (fsSync.existsSync(dir)) {
+            await fs.rm(dir, { recursive: true, force: true });
+        }
+    }
+
     async cancelTask(ownerId, id) {
         this._requireOwnerId(ownerId);
 

@@ -134,9 +134,6 @@ class VoiceService extends EventEmitter {
             if (this.currentState === SPEECH_STATES.INTERRUPTED) return;
             this._transitionTo(SPEECH_STATES.SPEAKING);
 
-            // Compute accurate lip sync (viseme) timings
-            const visemes = this.calculateLipSync(text);
-
             // Base64 data URI - playable directly by an <audio> element on the
             // frontend with zero backend disk I/O and no static file route needed.
             const audioDataUri = `data:${audioData.mimeType};base64,${audioData.audio.toString("base64")}`;
@@ -145,8 +142,17 @@ class VoiceService extends EventEmitter {
                 text,
                 ownerId,
                 audio: audioDataUri,
-                voice: audioData.voice,
-                visemes // Lip sync mouth shapes array with timestamps
+                voice: audioData.voice
+                // NOTE: mouth movement is driven entirely by the frontend's real
+                // Web Audio AnalyserNode reading the actual played-back audio
+                // (see yuna/src/live2d/LipSyncEngine.js) - not by any
+                // backend-precomputed viseme timings. A previous
+                // `calculateLipSync()` helper here generated Math.random()-based
+                // fake mouth-opening values and emitted them as `visemes`, but
+                // nothing on the frontend ever read that field (confirmed: no
+                // references to `.visemes` anywhere in yuna/src). It's been
+                // removed rather than left as unused fake data alongside the
+                // real analyser-driven implementation.
             });
 
             // Real duration estimated from the actual audio byte size and the
@@ -278,36 +284,6 @@ class VoiceService extends EventEmitter {
             }
         }
         return false;
-    }
-
-    /**
-     * Accurate Lip Sync (Visemes) preparation helper.
-     * Computes mouth parameters (MouthY / MouthOpen) over time.
-     */
-    calculateLipSync(text) {
-        const words = text.split(/\s+/);
-        const visemes = [];
-        let currentTimeMs = 0;
-
-        for (const word of words) {
-            const syllables = Math.max(1, Math.round(word.length / 3));
-            for (let i = 0; i < syllables; i++) {
-                // A, O, E, I, U mouth shape levels (0 to 1)
-                const opening = Math.random() * 0.6 + 0.35;
-                visemes.push({
-                    time: currentTimeMs,
-                    opening: Number(opening.toFixed(2))
-                });
-                currentTimeMs += 180 + Math.floor(Math.random() * 80);
-            }
-            // Word gap pause
-            visemes.push({
-                time: currentTimeMs,
-                opening: 0.0
-            });
-            currentTimeMs += 100;
-        }
-        return visemes;
     }
 
     delay(ms) {

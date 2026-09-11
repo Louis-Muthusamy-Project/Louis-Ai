@@ -5,6 +5,7 @@ const helmet = require("helmet");
 const rateLimit = require("express-rate-limit");
 const settingsRoutes = require("../routes/settingsRoutes");
 const authRoutes = require("../routes/auth.routes");
+const adminRoutes = require("../routes/admin.routes");
 const { requireAuth } = require("../middleware/authMiddleware");
 
 function createApp() {
@@ -75,6 +76,12 @@ function createApp() {
     "/api/settings",
     requireAuth,
     settingsRoutes
+  );
+
+  app.use(
+    "/api/admin",
+    requireAuth,
+    adminRoutes
   );
 
   /**

@@ -1,5 +1,6 @@
 const { handleChatMessage, cancelStream } = require("../controllers/chatController");
 const Events = require("./socketEvents");
+const { userHasFeature } = require("../middleware/featureMiddleware");
 
 // userId -> Set<socketId>. A user may have more than one tab/device connected.
 const userSockets = new Map();
@@ -92,7 +93,23 @@ function registerSocketHandlers(io) {
 
     io.on("connection", (socket) => {
         const userId = socket.data && socket.data.user && socket.data.user.id;
+        const user = socket.data && socket.data.user;
         _registerUserSocket(userId, socket.id);
+
+        /**
+         * Backend enforcement of Part 9 (Module Access Model) at the
+         * Socket.IO layer - mirrors requireFeature() for HTTP routes.
+         * Hiding a disabled tab on the frontend is UX only; this is what
+         * actually stops a manually-sent event for a disabled module.
+         */
+        const requireFeatureSocket = (featureName, errorEvent, message) => {
+            if (userHasFeature(user, featureName)) return true;
+            socket.emit(errorEvent, {
+                message: message || `The "${featureName}" feature is disabled for this account.`,
+                code: "FEATURE_DISABLED"
+            });
+            return false;
+        };
 
         console.log("=================================");
         console.log("🟢 New Client Connected");
@@ -111,6 +128,7 @@ function registerSocketHandlers(io) {
         socket.on(
             Events.MESSAGE_SEND,
             async payload => {
+                if (!requireFeatureSocket("chat", Events.MESSAGE_ERROR)) return;
                 try {
                     await handleChatMessage(
                         socket,
@@ -142,6 +160,7 @@ function registerSocketHandlers(io) {
         // chatController.cancelStream().
         socket.on(Events.STREAM_CANCEL, () => {
             if (!userId) return;
+            if (!requireFeatureSocket("chat", Events.MESSAGE_ERROR)) return;
             cancelStream(userId);
         });
 
@@ -151,6 +170,7 @@ function registerSocketHandlers(io) {
                     socket.emit(Events.MESSAGE_ERROR, { message: "Not authenticated." });
                     return;
                 }
+                if (!requireFeatureSocket("character", Events.MESSAGE_ERROR)) return;
                 const visionService = require('../services/visionService');
                 const memory = await visionService.processImage(userId, payload.image, payload.source);
                 socket.emit('VISION_RESULT', memory);
@@ -170,6 +190,7 @@ function registerSocketHandlers(io) {
                 socket.emit(Events.IMAGE_ERROR, { message: "Not authenticated." });
                 return;
             }
+            if (!requireFeatureSocket("chat", Events.IMAGE_ERROR)) return;
             const prompt = payload && payload.prompt;
             const imageCapability = require("../capabilities/ImageGenerationCapability");
             const result = await imageCapability.generate(userId, prompt);
@@ -184,6 +205,7 @@ function registerSocketHandlers(io) {
 
         socket.on("CODING_PROVIDERS_LIST", async () => {
             if (!userId) return;
+            if (!requireFeatureSocket("coding", Events.CODING_AGENT_ERROR)) return;
             const codingCapability = require("../capabilities/CodingWorkspaceCapability");
             const result = await codingCapability.execute({ action: "agent.providers", params: {}, __ownerId: userId });
             socket.emit("CODING_PROVIDERS_RESULT", result);
@@ -194,6 +216,7 @@ function registerSocketHandlers(io) {
                 socket.emit(Events.CODING_AGENT_ERROR, { message: "Not authenticated." });
                 return;
             }
+            if (!requireFeatureSocket("coding", Events.CODING_AGENT_ERROR)) return;
             const codingCapability = require("../capabilities/CodingWorkspaceCapability");
             // agent.run resolves only once the WHOLE run finishes/pauses/is
             // cancelled/hits a limit - progress is observed via the
@@ -216,6 +239,7 @@ function registerSocketHandlers(io) {
 
         socket.on("CODING_AGENT_CANCEL", async (payload) => {
             if (!userId) return;
+            if (!requireFeatureSocket("coding", Events.CODING_AGENT_ERROR)) return;
             const codingCapability = require("../capabilities/CodingWorkspaceCapability");
             // sessionId is opaque and only ever meaningful in the context of
             // the run that emitted it to this same authenticated user via
@@ -231,6 +255,7 @@ function registerSocketHandlers(io) {
                 socket.emit(Events.CODING_AGENT_ERROR, { message: "Not authenticated." });
                 return;
             }
+            if (!requireFeatureSocket("coding", Events.CODING_AGENT_ERROR)) return;
             const codingCapability = require("../capabilities/CodingWorkspaceCapability");
             // Resolves once the resumed run finishes/pauses again/hits a
             // limit - same "watch the CODING_* events, not this response"
@@ -273,6 +298,10 @@ function registerSocketHandlers(io) {
             const respond = typeof callback === "function" ? callback : () => {};
             if (!userId) {
                 respond({ success: false, message: "Not authenticated." });
+                return;
+            }
+            if (!userHasFeature(user, "coding")) {
+                respond({ success: false, message: "The \"coding\" feature is disabled for this account.", code: "FEATURE_DISABLED" });
                 return;
             }
             const action = payload && payload.action;

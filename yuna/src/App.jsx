@@ -5,10 +5,13 @@ import { Spin } from 'antd';
 import ChatView from './views/ChatView/ChatView';
 import CharacterView from './views/CharacterView/CharacterView';
 import CodingView from './views/CodingView/CodingView';
+import AdminView from './views/AdminView/AdminView';
 import LoginView from './views/Auth/LoginView/LoginView';
 import SignupView from './views/Auth/SignupView/SignupView';
+import ForgotPasswordView from './views/Auth/ForgotPasswordView/ForgotPasswordView';
 import ProtectedRoute from './components/Auth/ProtectedRoute';
 import PublicOnlyRoute from './components/Auth/PublicOnlyRoute';
+import SuperAdminRoute from './components/Auth/SuperAdminRoute';
 import AppShell from './components/Layout/AppShell';
 import useAuthStore from './store/authStore';
 import { palette } from './theme/yunaTheme';
@@ -44,6 +47,7 @@ export default function App() {
 
       <Route path="/login" element={<PublicOnlyRoute><LoginView /></PublicOnlyRoute>} />
       <Route path="/signup" element={<PublicOnlyRoute><SignupView /></PublicOnlyRoute>} />
+      <Route path="/forgot-password" element={<PublicOnlyRoute><ForgotPasswordView /></PublicOnlyRoute>} />
 
       <Route
         element={
@@ -52,10 +56,14 @@ export default function App() {
           </ProtectedRoute>
         }
       >
-        {/* Exactly 3 primary tabs - see components/Layout/MainNav.jsx */}
+        {/* Exactly 3 primary tabs - see components/Layout/MainNav.jsx - plus
+            /admin, only ever reachable/rendered for the real Super Admin
+            account (SuperAdminRoute + MainNav both gate on user.role, which
+            only ever comes from the server). */}
         <Route path="/chat" element={<ChatView />} />
         <Route path="/character" element={<CharacterView />} />
         <Route path="/coding" element={<CodingView />} />
+        <Route path="/admin" element={<SuperAdminRoute><AdminView /></SuperAdminRoute>} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" replace />} />

@@ -59,4 +59,31 @@ async function logout() {
     }
 }
 
-export default { signup, login, me, logout };
+async function forgotPassword(email) {
+    try {
+        const { data } = await apiClient.post("/auth/forgot-password", { email });
+        return data; // { success, message } - always this generic shape
+    } catch (error) {
+        throw normalizeError(error);
+    }
+}
+
+async function verifyOtp({ email, otp }) {
+    try {
+        const { data } = await apiClient.post("/auth/verify-otp", { email, otp });
+        return data; // { success, resetToken, expiresInMinutes }
+    } catch (error) {
+        throw normalizeError(error);
+    }
+}
+
+async function resetPassword({ email, resetToken, newPassword, confirmPassword }) {
+    try {
+        const { data } = await apiClient.post("/auth/reset-password", { email, resetToken, newPassword, confirmPassword });
+        return data; // { success }
+    } catch (error) {
+        throw normalizeError(error);
+    }
+}
+
+export default { signup, login, me, logout, forgotPassword, verifyOtp, resetPassword };

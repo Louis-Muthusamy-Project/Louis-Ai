@@ -11,12 +11,16 @@ const FileMemoryRepository = require("./infrastructure/FileMemoryRepository");
 const MongoMemoryRepository = require("./infrastructure/MongoMemoryRepository");
 const FileUserRepository = require("./infrastructure/FileUserRepository");
 const MongoUserRepository = require("./infrastructure/MongoUserRepository");
+const FilePasswordResetRepository = require("./infrastructure/FilePasswordResetRepository");
+const MongoPasswordResetRepository = require("./infrastructure/MongoPasswordResetRepository");
 const FileCodingSessionRepository = require("./infrastructure/FileCodingSessionRepository");
 const MongoCodingSessionRepository = require("./infrastructure/MongoCodingSessionRepository");
 const CodingSessionService = require("./services/coding/CodingSessionService");
 const ProviderManager = require("./providers/ProviderManager");
 
 const { AuthService } = require("./services/authService");
+const { PasswordResetService } = require("./services/passwordResetService");
+const emailService = require("./services/emailService");
 const { SettingsService } = require("./services/settingsService");
 const { ConversationService } = require("./services/conversationService");
 const { MemoryService } = require("./services/memoryService");
@@ -57,6 +61,10 @@ function registerBindings() {
     const userRepository = useMongo ? new MongoUserRepository() : new FileUserRepository();
     Kernel.register("userRepository", userRepository);
 
+    const passwordResetRepository = useMongo ? new MongoPasswordResetRepository() : new FilePasswordResetRepository();
+    Kernel.register("passwordResetRepository", passwordResetRepository);
+    Kernel.register("emailService", emailService);
+
     const codingSessionRepository = useMongo ? new MongoCodingSessionRepository() : new FileCodingSessionRepository();
     Kernel.register("codingSessionService", new CodingSessionService(codingSessionRepository));
 
@@ -65,6 +73,7 @@ function registerBindings() {
 
     // Services
     Kernel.register("authService", new AuthService(Kernel));
+    Kernel.register("passwordResetService", new PasswordResetService(Kernel));
     Kernel.register("settingsService", SettingsService);
     Kernel.register("conversationService", ConversationService);
     Kernel.register("memoryService", MemoryService);
@@ -103,24 +112,25 @@ function registerBindings() {
     // Agents
     const PlannerAgent = require("./agents/PlannerAgent");
     const ExecutorAgent = require("./agents/ExecutorAgent");
-    const MemoryAgent = require("./agents/MemoryAgent");
-    const VisionAgent = require("./agents/VisionAgent");
-    const VoiceAgent = require("./agents/VoiceAgent");
     const CodingAgent = require("./agents/CodingAgent");
     const BrowserAgent = require("./agents/BrowserAgent");
     const AutomationAgent = require("./agents/AutomationAgent");
-    const LearningAgent = require("./agents/LearningAgent");
+    // MemoryAgent/VisionAgent/VoiceAgent/LearningAgent are intentionally NOT
+    // registered here (Part 3 audit - "no registered fake/stub capabilities").
+    // Each file explains why: real memory/vision/voice functionality already
+    // exists and is used directly (memoryService/visionService/voiceService,
+    // called straight from AIOrchestrator/socketHandler), not through this
+    // agent/event-broadcast layer, and there's no equivalent real
+    // "learning" service at all. See the doc comment at the top of each of
+    // those four files for the full rationale and what would be needed to
+    // wire one in for real.
 
     Kernel.register("agents", [
         new PlannerAgent(Kernel),
         new ExecutorAgent(Kernel),
-        new MemoryAgent(Kernel),
-        new VisionAgent(Kernel),
-        new VoiceAgent(Kernel),
         new CodingAgent(Kernel),
         new BrowserAgent(Kernel),
-        new AutomationAgent(Kernel),
-        new LearningAgent(Kernel)
+        new AutomationAgent(Kernel)
     ]);
 
     Kernel.register("aiOrchestrator", new AIOrchestrator(Kernel));
@@ -135,6 +145,38 @@ async function bootstrap() {
     if (typeof memoryRepository.initialize === "function") {
         await memoryRepository.initialize();
     }
+
+    // Part 15 - Data Migration: backfill role/features on any User document
+    // written before those fields existed. Safe/idempotent (only touches
+    // docs missing the field), never overwrites an existing value, and
+    // never touches passwordHash. File-mode users get the same backfill
+    // lazily via FileUserRepository's _withDefaults() on every read.
+    try {
+        const useMongo = process.env.NODE_ENV === "production" || process.env.USE_MONGO === "true";
+        if (useMongo) {
+            const mongoose = require("mongoose");
+            if (mongoose.connection.readyState === 1) {
+                const User = require("./models/User");
+                const { DEFAULT_FEATURES, roleForEmail } = require("./config/roles");
+
+                const legacyUsers = await User.find({
+                    $or: [{ role: { $exists: false } }, { features: { $exists: false } }]
+                }).select("_id email role features");
+
+                for (const doc of legacyUsers) {
+                    doc.role = doc.role || roleForEmail((doc.email || "").toLowerCase());
+                    doc.features = { ...DEFAULT_FEATURES, ...(doc.features || {}) };
+                    await doc.save();
+                }
+                if (legacyUsers.length > 0) {
+                    console.log(`[migration] Backfilled role/features on ${legacyUsers.length} legacy user(s).`);
+                }
+            }
+        }
+    } catch (error) {
+        console.error("[migration] User role/features backfill failed (non-fatal):", error.message);
+    }
+
     const pluginLoader = Kernel.get("pluginLoader");
     const capabilityRegistry = Kernel.get("capabilityRegistry");
     const ToolManager = require("./tools"); 

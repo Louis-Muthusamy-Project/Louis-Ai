@@ -2,6 +2,7 @@ const bcrypt = require("bcryptjs");
 
 const Kernel = require("../core/Kernel");
 const { signAccessToken } = require("../utils/jwt");
+const { roleForEmail, ROLES, DEFAULT_FEATURES } = require("../config/roles");
 
 const MIN_PASSWORD_LENGTH = 8;
 const SALT_ROUNDS = 12;
@@ -76,12 +77,19 @@ class AuthService {
 
         const passwordHash = await bcrypt.hash(clean.password, SALT_ROUNDS);
 
+        // Role is decided ONLY from the server-normalized email against the
+        // server-side constant (config/roles.js) - never from anything the
+        // client sends. This is the sole place a super_admin role is granted.
+        const role = roleForEmail(clean.email);
+
         let created;
         try {
             created = await this.userRepository.create({
                 name: clean.name,
                 email: clean.email,
-                passwordHash
+                passwordHash,
+                role,
+                features: { ...DEFAULT_FEATURES }
             });
         } catch (error) {
             if (error.code === "EMAIL_TAKEN") {
@@ -124,8 +132,26 @@ class AuthService {
             throw invalidCredentialsError();
         }
 
+        if (user.status === "disabled") {
+            const error = new Error("This account has been disabled.");
+            error.status = 403;
+            error.code = "ACCOUNT_DISABLED";
+            throw error;
+        }
+
+        // Self-healing migration safety net (Part 15): if this is the exact
+        // Super Admin email but an older/legacy record wasn't migrated to
+        // role=super_admin yet, correct it here - server-side, keyed only
+        // off the verified DB email (never off anything the client sends).
+        const expectedRole = roleForEmail(user.email);
+        if (user.role !== expectedRole && typeof this.userRepository.updateRole === "function") {
+            await this.userRepository.updateRole(user.id, expectedRole).catch(() => {});
+        }
+
+        await this.userRepository.touchLastLogin(user.id).catch(() => {});
+
         const token = signAccessToken(user.id);
-        return { user: this._toSafeUser(user), token };
+        return { user: this._toSafeUser({ ...user, role: expectedRole }), token };
     }
 
     async getUserById(id) {
@@ -134,6 +160,12 @@ class AuthService {
             const error = new Error("User not found.");
             error.status = 401;
             error.code = "USER_NOT_FOUND";
+            throw error;
+        }
+        if (user.status === "disabled") {
+            const error = new Error("This account has been disabled.");
+            error.status = 403;
+            error.code = "ACCOUNT_DISABLED";
             throw error;
         }
         return this._toSafeUser(user);

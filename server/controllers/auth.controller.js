@@ -1,4 +1,9 @@
 const authService = require("../services/authService");
+const Kernel = require("../core/Kernel");
+
+function passwordResetService() {
+    return Kernel.get("passwordResetService");
+}
 
 function sendAuthError(res, error) {
     // authService/authMiddleware attach status+code to expected errors.
@@ -49,4 +54,52 @@ async function logout(req, res) {
     return res.status(200).json({ success: true, message: "Logged out." });
 }
 
-module.exports = { signup, login, me, logout };
+/**
+ * POST /api/auth/forgot-password
+ * Body: { email }
+ * Always 200 + generic message, regardless of whether the email exists.
+ */
+async function forgotPassword(req, res) {
+    try {
+        const { email } = req.body || {};
+        const result = await passwordResetService().requestReset(email);
+        return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+        // requestReset() itself never throws for "unknown email" - only
+        // unexpected internal errors reach here.
+        return sendAuthError(res, error);
+    }
+}
+
+/**
+ * POST /api/auth/verify-otp
+ * Body: { email, otp }
+ * Returns a short-lived resetToken required by /reset-password.
+ */
+async function verifyOtp(req, res) {
+    try {
+        const { email, otp } = req.body || {};
+        const result = await passwordResetService().verifyOtp(email, otp);
+        return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+        return sendAuthError(res, error);
+    }
+}
+
+/**
+ * POST /api/auth/reset-password
+ * Body: { email, resetToken, newPassword, confirmPassword }
+ * Requires a resetToken from a successful /verify-otp call - an email
+ * alone (without proving OTP ownership) can never reach this.
+ */
+async function resetPassword(req, res) {
+    try {
+        const { email, resetToken, newPassword, confirmPassword } = req.body || {};
+        const result = await passwordResetService().resetPassword({ email, resetToken, newPassword, confirmPassword });
+        return res.status(200).json({ success: true, ...result });
+    } catch (error) {
+        return sendAuthError(res, error);
+    }
+}
+
+module.exports = { signup, login, me, logout, forgotPassword, verifyOtp, resetPassword };

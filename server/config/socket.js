@@ -1,5 +1,6 @@
 const { Server } = require("socket.io");
 const { verifyAccessToken } = require("../utils/jwt");
+const authService = require("../services/authService");
 
 function createSocketServer(server) {
   const io = new Server(server, {
@@ -18,7 +19,7 @@ function createSocketServer(server) {
     pingInterval: 25000,
   });
 
-  io.use((socket, next) => {
+  io.use(async (socket, next) => {
     const token = socket.handshake.auth && socket.handshake.auth.token;
 
     if (!token) {
@@ -29,10 +30,17 @@ function createSocketServer(server) {
 
     try {
       const decoded = verifyAccessToken(token);
-      socket.data.user = { id: decoded.sub };
+      // Fetch the full server-side user record (role/features/status) so
+      // every socket event handler can enforce feature toggles/role the
+      // same way HTTP routes do via requireFeature/requireSuperAdmin -
+      // never trust a role/features value coming from the client itself.
+      const user = await authService.getUserById(decoded.sub);
+      socket.data.user = user; // { id, name, email, role, features, status, ... }
       return next();
     } catch (err) {
-      const code = err.name === "TokenExpiredError" ? "TOKEN_EXPIRED" : "INVALID_TOKEN";
+      const code = err.code === "ACCOUNT_DISABLED"
+        ? "ACCOUNT_DISABLED"
+        : (err.name === "TokenExpiredError" ? "TOKEN_EXPIRED" : "INVALID_TOKEN");
       const error = new Error("Invalid or expired session.");
       error.data = { code };
       return next(error);

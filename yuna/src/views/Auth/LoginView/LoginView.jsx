@@ -77,6 +77,10 @@ export default function LoginView() {
                     <Checkbox>Remember me</Checkbox>
                 </Form.Item>
 
+                <Form.Item style={{ marginBottom: 12, textAlign: "right" }}>
+                    <Link to="/forgot-password">Forgot password?</Link>
+                </Form.Item>
+
                 <Form.Item style={{ marginBottom: 0 }}>
                     <Button
                         type="primary"

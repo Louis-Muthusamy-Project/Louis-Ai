@@ -3,6 +3,7 @@ const path = require("path");
 const crypto = require("crypto");
 
 const UserRepository = require("./UserRepository");
+const { DEFAULT_FEATURES, ROLES } = require("../config/roles");
 
 /**
  * ==========================================
@@ -73,17 +74,34 @@ class FileUserRepository extends UserRepository {
         return next;
     }
 
+    /**
+     * Backfills defaults for legacy records written before role/features
+     * existed (Part 15 - Data Migration). Never overwrites an explicitly
+     * stored value, only fills in what's missing.
+     */
+    _withDefaults(user) {
+        if (!user) return user;
+        return {
+            role: ROLES.USER,
+            status: "active",
+            features: { ...DEFAULT_FEATURES },
+            lastLoginAt: null,
+            ...user,
+            features: { ...DEFAULT_FEATURES, ...(user.features || {}) }
+        };
+    }
+
     async findByEmail(email) {
         const users = this._readAll();
-        return users.find(u => u.email === email) || null;
+        return this._withDefaults(users.find(u => u.email === email)) || null;
     }
 
     async findById(id) {
         const users = this._readAll();
-        return users.find(u => u.id === id) || null;
+        return this._withDefaults(users.find(u => u.id === id)) || null;
     }
 
-    async create({ name, email, passwordHash }) {
+    async create({ name, email, passwordHash, role, features }) {
         return this._withLock((users) => {
             if (users.some(u => u.email === email)) {
                 // authService already checks this, but guard here too in case
@@ -99,6 +117,10 @@ class FileUserRepository extends UserRepository {
                 name,
                 email,
                 passwordHash,
+                role: role || ROLES.USER,
+                status: "active",
+                features: { ...DEFAULT_FEATURES, ...(features || {}) },
+                lastLoginAt: null,
                 createdAt: now,
                 updatedAt: now
             };
@@ -106,6 +128,70 @@ class FileUserRepository extends UserRepository {
             users.push(user);
             this._writeAll(users);
             return user;
+        });
+    }
+
+    async list() {
+        const users = this._readAll();
+        return users.map(u => this._withDefaults(u));
+    }
+
+    async updateFeatures(id, features) {
+        return this._withLock((users) => {
+            const index = users.findIndex(u => u.id === id);
+            if (index === -1) return null;
+
+            users[index] = {
+                ...this._withDefaults(users[index]),
+                features: { ...this._withDefaults(users[index]).features, ...features },
+                updatedAt: new Date().toISOString()
+            };
+            this._writeAll(users);
+            return users[index];
+        });
+    }
+
+    async updateRole(id, role) {
+        return this._withLock((users) => {
+            const index = users.findIndex(u => u.id === id);
+            if (index === -1) return null;
+            users[index] = { ...users[index], role, updatedAt: new Date().toISOString() };
+            this._writeAll(users);
+            return users[index];
+        });
+    }
+
+    async deleteById(id) {
+        return this._withLock((users) => {
+            const index = users.findIndex(u => u.id === id);
+            if (index === -1) return false;
+            users.splice(index, 1);
+            this._writeAll(users);
+            return true;
+        });
+    }
+
+    async touchLastLogin(id) {
+        return this._withLock((users) => {
+            const index = users.findIndex(u => u.id === id);
+            if (index === -1) return null;
+            users[index] = { ...users[index], lastLoginAt: new Date().toISOString() };
+            this._writeAll(users);
+            return users[index];
+        });
+    }
+
+    async updatePasswordHash(id, passwordHash) {
+        return this._withLock((users) => {
+            const index = users.findIndex(u => u.id === id);
+            if (index === -1) return null;
+            users[index] = {
+                ...users[index],
+                passwordHash,
+                updatedAt: new Date().toISOString()
+            };
+            this._writeAll(users);
+            return users[index];
         });
     }
 }

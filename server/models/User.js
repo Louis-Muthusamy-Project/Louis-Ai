@@ -27,6 +27,26 @@ const UserSchema = new mongoose.Schema(
             type: String,
             required: true,
             select: false
+        },
+        role: {
+            type: String,
+            enum: ["user", "super_admin"],
+            default: "user",
+            index: true
+        },
+        status: {
+            type: String,
+            enum: ["active", "disabled"],
+            default: "active"
+        },
+        features: {
+            chat: { type: Boolean, default: true },
+            character: { type: Boolean, default: true },
+            coding: { type: Boolean, default: true }
+        },
+        lastLoginAt: {
+            type: Date,
+            default: null
         }
     },
     { timestamps: true }

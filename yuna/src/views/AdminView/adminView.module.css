@@ -1,0 +1,17 @@
+.root {
+    padding: 24px;
+    height: 100%;
+    overflow: auto;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 20px;
+}
+
+.table {
+    background: transparent;
+}

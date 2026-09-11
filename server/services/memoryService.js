@@ -202,6 +202,19 @@ Memory: "${text}"`;
         }
     }
 
+    /**
+     * Deletes all memory data owned by a user - used by the Super Admin
+     * "delete account" flow (admin.controller.js). Clears short-term
+     * (in-process) memory plus the persisted profile/long-term memories
+     * via the existing repository, so nothing is left behind after the
+     * User document itself is removed.
+     */
+    async deleteAllForUser(userId) {
+        this.clearShortMemory(userId);
+        await this.repository.writeMemories(userId, []);
+        await this.repository.writeProfile(userId, {});
+    }
+
     // Profile & Relationship operations
     async getProfile(userId) {
         return await this.repository.readProfile(userId);
@@ -400,7 +413,8 @@ const wrapper = {
     saveLongMemory: (u, k, v) => Kernel.get("memoryService").saveLongMemory(u, k, v),
     getLongMemory: (u) => Kernel.get("memoryService").getLongMemory(u),
     removeLongMemory: (u, k) => Kernel.get("memoryService").removeLongMemory(u, k),
-    getSummary: (u) => Kernel.get("memoryService").getSummary(u)
+    getSummary: (u) => Kernel.get("memoryService").getSummary(u),
+    deleteAllForUser: (u) => Kernel.get("memoryService").deleteAllForUser(u)
 };
 
 module.exports = Object.assign(wrapper, { MemoryService });
