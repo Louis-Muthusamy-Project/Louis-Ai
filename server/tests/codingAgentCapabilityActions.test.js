@@ -106,3 +106,37 @@ test("CodingWorkspaceCapability: agent.cancel forwards to CodingAgentRuntime.can
     assert.equal(result.success, true);
     assert.equal(result.cancelled, false); // unknown/finished session -> false, but call itself succeeds
 });
+
+test("CodingWorkspaceCapability: terminal.cancel is owner-scoped end-to-end - another user cannot kill it", async () => {
+    makeWorkspace("termcapuser");
+    await capability.initialize(Kernel);
+
+    const runPromise = capability.execute({
+        action: "terminal.run",
+        params: { command: `node -e "setTimeout(() => {}, 30000)"`, timeoutMs: 30000 },
+        __ownerId: "termcapuser"
+    });
+
+    await new Promise((r) => setTimeout(r, 200));
+    const { CodingTerminalService } = require("../services/codingTerminalService");
+    const [runId] = CodingTerminalService._running.keys();
+    assert.ok(runId, "expected a running process to be tracked");
+
+    const attackerResult = await capability.execute({
+        action: "terminal.cancel",
+        params: { runId },
+        __ownerId: "attacker"
+    });
+    assert.equal(attackerResult.cancelled, false);
+    assert.ok(CodingTerminalService._running.has(runId), "process must still be running after a cross-user cancel attempt");
+
+    const ownerResult = await capability.execute({
+        action: "terminal.cancel",
+        params: { runId },
+        __ownerId: "termcapuser"
+    });
+    assert.equal(ownerResult.cancelled, true);
+
+    const runResult = await runPromise;
+    assert.equal(runResult.cancelled, true);
+});

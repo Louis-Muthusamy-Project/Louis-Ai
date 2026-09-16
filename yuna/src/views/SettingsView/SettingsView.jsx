@@ -7,6 +7,7 @@ import useSettings from "../../hooks/useSettings";
 import useSettingsStore from "../../store/settingsStore";
 import useAuthStore from "../../store/authStore";
 import SystemInfo from "../../components/System/SystemInfo";
+import WakeSettingsPanel from "../../components/Settings/WakeSettingsPanel";
 
 import styles from "./settingsView.module.css";
 
@@ -125,6 +126,11 @@ export default function SettingsView() {
                     </div>
                 </div>
             )
+        },
+        {
+            key: "wake",
+            label: "Wake Word",
+            children: <WakeSettingsPanel />
         },
         {
             key: "features",

@@ -103,11 +103,37 @@ test("CodingTerminalService: cancel() actually terminates a running process earl
     // final resolved result (see CodingWorkspaceCapability for that flow).
     const [runId] = CodingTerminalService._running.keys();
     assert.ok(runId, "expected a running process to be tracked");
-    const cancelled = CodingTerminalService.cancel(runId);
+    const cancelled = CodingTerminalService.cancel("termuser", runId);
     assert.equal(cancelled, true);
 
     const result = await runPromise;
     assert.equal(result.cancelled, true);
+});
+
+test("CodingTerminalService: cancel() is owner-scoped - another user cannot kill this process", async () => {
+    makeWorkspace();
+    const runPromise = CodingTerminalService.run(
+        "termuser",
+        `node -e "setTimeout(() => {}, 30000)"`,
+        { timeoutMs: 30000 }
+    );
+
+    await new Promise((r) => setTimeout(r, 200));
+    const [runId] = CodingTerminalService._running.keys();
+    assert.ok(runId, "expected a running process to be tracked");
+
+    // A different user attempting to cancel termuser's process must fail
+    // (false, not an error) and must NOT actually kill the process.
+    const attackerCancelled = CodingTerminalService.cancel("attacker", runId);
+    assert.equal(attackerCancelled, false);
+    assert.ok(CodingTerminalService._running.has(runId), "process must still be running after a cross-user cancel attempt");
+
+    // The real owner can still cancel it normally.
+    const ownerCancelled = CodingTerminalService.cancel("termuser", runId);
+    assert.equal(ownerCancelled, true);
+
+    const result2 = await runPromise;
+    assert.equal(result2.cancelled, true);
 });
 
 test("CodingTerminalService: rejects a cwd that escapes the workspace", async () => {

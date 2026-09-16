@@ -95,7 +95,7 @@ class CodingWorkspaceCapability extends BaseCapability {
                         onStart: params.onStart
                     }) };
                 case "terminal.cancel":
-                    return { success: true, cancelled: CodingTerminalService.cancel(params.runId) };
+                    return { success: true, cancelled: CodingTerminalService.cancel(__ownerId, params.runId) };
 
                 case "git.status":
                     return { success: true, ...await CodingGitService.status(__ownerId, { cwd: params.cwd }) };
@@ -130,7 +130,7 @@ class CodingWorkspaceCapability extends BaseCapability {
                 }
 
                 case "agent.cancel":
-                    return { success: true, cancelled: this._runtime.cancel(params.sessionId) };
+                    return { success: true, cancelled: this._runtime.cancel(__ownerId, params.sessionId) };
 
                 case "agent.resume": {
                     const result = await this._runtime.resume(__ownerId, params.sessionId, {

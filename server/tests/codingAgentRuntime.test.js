@@ -174,13 +174,44 @@ test("CodingAgentRuntime: cancel() actually stops the loop and kills a real runn
     // Give the terminal command a moment to actually spawn, then cancel.
     await new Promise((r) => setTimeout(r, 300));
     assert.ok(capturedSessionId, "expected to capture a session id from coding:session:start");
-    const cancelled = CodingAgentRuntime.cancel(capturedSessionId);
+    const cancelled = CodingAgentRuntime.cancel("agentuser", capturedSessionId);
     assert.equal(cancelled, true);
 
     const result = await runPromise;
     assert.equal(result.state, STATES.CANCELLED);
     // Only got through the first scripted turn - never reached the second.
     assert.equal(provider.turnIndex, 1);
+});
+
+test("CodingAgentRuntime: cancel() is owner-scoped - another user cannot cancel this session", async () => {
+    makeWorkspace();
+    const script = [
+        { calls: [{ name: "terminal_run", args: { command: `node -e "setTimeout(() => {}, 30000)"` } }] },
+        { text: "should never get here" }
+    ];
+    const provider = new FakeCodingModelProvider(script);
+    const bus = new EventEmitter();
+    let capturedSessionId = null;
+    bus.on("coding:session:start", (e) => { capturedSessionId = e.sessionId; });
+    CodingAgentRuntime.initialize(bus);
+
+    const runPromise = CodingAgentRuntime.run("agentuser", "run something long", provider);
+
+    await new Promise((r) => setTimeout(r, 300));
+    assert.ok(capturedSessionId, "expected to capture a session id from coding:session:start");
+
+    // A different user must not be able to cancel agentuser's session -
+    // and the loop must keep running exactly as if nothing happened.
+    assert.throws(() => CodingAgentRuntime.cancel(null, capturedSessionId));
+    const attackerCancelled = CodingAgentRuntime.cancel("attacker", capturedSessionId);
+    assert.equal(attackerCancelled, false);
+
+    // The real owner can still cancel it normally.
+    const ownerCancelled = CodingAgentRuntime.cancel("agentuser", capturedSessionId);
+    assert.equal(ownerCancelled, true);
+
+    const result = await runPromise;
+    assert.equal(result.state, STATES.CANCELLED);
 });
 
 test("CodingAgentRuntime: a destructive action requiring confirmation pauses the run instead of executing or auto-approving", async () => {

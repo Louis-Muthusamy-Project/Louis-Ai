@@ -131,14 +131,23 @@ class CodingAgentRuntime {
         }
     }
 
-    /** Cancels a running session. Safe to call for an unknown/finished id. */
-    cancel(sessionId) {
+    /**
+     * Cancels a running session. Requires the calling userId to match the
+     * session's owner - mirrors the same ownership check resume() already
+     * does below (treat a mismatched owner the same as "no such session",
+     * so this never reveals whether a given sessionId belongs to someone
+     * else). Safe to call for an unknown/finished id, or for another
+     * user's session (both return false).
+     */
+    cancel(userId, sessionId) {
+        if (!userId) throw new Error("CodingAgentRuntime.cancel requires an authenticated userId.");
         const session = this._sessions.get(sessionId);
         if (!session) return false;
+        if (session.userId !== userId) return false;
         if (session.state !== STATES.RUNNING) return false;
         session.cancelled = true;
         if (session.lastRunId) {
-            CodingTerminalService.cancel(session.lastRunId);
+            CodingTerminalService.cancel(session.userId, session.lastRunId);
         }
         return true;
     }

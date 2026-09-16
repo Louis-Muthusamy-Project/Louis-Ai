@@ -73,7 +73,12 @@ class TerminalCommandError extends Error {
 
 class CodingTerminalService {
     constructor() {
-        /** @type {Map<string, import('child_process').ChildProcess>} */
+        /**
+         * @type {Map<string, { child: import('child_process').ChildProcess, ownerId: string }>}
+         * Every running process is tracked with the userId that started it,
+         * so cancel() can enforce that only the owner can kill their own
+         * process - see cancel() below.
+         */
         this._running = new Map();
     }
 
@@ -132,7 +137,7 @@ class CodingTerminalService {
                 env: scrubEnv(process.env)
             });
 
-            this._running.set(runId, child);
+            this._running.set(runId, { child, ownerId: userId });
             if (typeof onStart === "function") {
                 try { onStart(runId); } catch { /* caller's callback, not our problem to crash on */ }
             }
@@ -202,15 +207,25 @@ class CodingTerminalService {
     }
 
     /**
-     * Cancels a running command by the runId returned from run(). Returns
-     * true if a running process was found and killed, false otherwise
-     * (already finished, or unknown id).
+     * Cancels a running command by the runId returned from run(). Requires
+     * the calling userId to match the userId that started the process -
+     * terminal cancellation is owner-scoped for the same reason
+     * CodingAgentRuntime.cancel() is (see that file): a runId is an
+     * opaque identifier, and without this check any authenticated user
+     * who obtained another user's runId could kill their process.
+     * Returns true if a running process owned by userId was found and
+     * killed, false otherwise (already finished, unknown id, or owned by
+     * someone else - deliberately the same "false" for both of the
+     * latter two, so this never reveals whether a given runId exists for
+     * another user).
      */
-    cancel(runId) {
-        const child = this._running.get(runId);
-        if (!child) return false;
-        child.__markCancelled?.();
-        this._kill(child, process.platform === "win32");
+    cancel(userId, runId) {
+        if (!userId) throw new Error("CodingTerminalService.cancel requires an authenticated userId.");
+        const entry = this._running.get(runId);
+        if (!entry) return false;
+        if (entry.ownerId !== userId) return false;
+        entry.child.__markCancelled?.();
+        this._kill(entry.child, process.platform === "win32");
         return true;
     }
 

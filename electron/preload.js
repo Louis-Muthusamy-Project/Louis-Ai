@@ -23,13 +23,23 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     "automation:clipboard:write",
     "automation:notification:send",
     "automation:recycle:trashItem",
-    "automation:shell:open"
+    "automation:shell:open",
+    "wake:settings:get",
+    "wake:settings:set",
+    "wake:listener:status",
+    "wake:popup:show",
+    "wake:popup:ready",
+    "wake:popup:hide",
+    "wake:microphone:permission"
 ]);
 
-// No main -> renderer push channels are wired up (webContents.send) as of
-// this writing, so this starts empty rather than open. Add a channel here
-// deliberately if/when a real push event is introduced.
-const ALLOWED_LISTEN_CHANNELS = new Set([]);
+// Main -> renderer push channels (webContents.send) - kept in sync with
+// electron/ipc/wake.js's win.webContents.send() calls.
+const ALLOWED_LISTEN_CHANNELS = new Set([
+    "wake:popup:init",
+    "wake:status:update",
+    "wake:settings:changed"
+]);
 
 contextBridge.exposeInMainWorld(
 
