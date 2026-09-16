@@ -8,14 +8,13 @@ const voiceConfig = require("../../config/voice");
  * EdgeTTSProvider - Infrastructure Strategy
  * ------------------------------------------
  * Synthesizes speech fully in memory - no temp files are ever written
- * to disk. Previously this wrote every response to server/temp/*.mp3
- * and never cleaned it up; on top of that, toStream() was called
- * without awaiting it (it returns a Promise) and setMetadata() was
- * called with the wrong argument shape (rate/pitch/volume passed as
- * if they were metadata options, when they're actually prosody
- * options for toStream()) - between the two, synthesis reliably threw
- * before producing usable audio while still leaving an empty file
- * behind. Both are fixed here.
+ * to disk.
+ *
+ * setMetadata() is called with an explicit `{ voiceLocale }` metadata
+ * options object (not omitted) - the installed msedge-tts version has a
+ * bug where its own locale-inference branch dereferences the optional
+ * 3rd argument without a null check, throwing on every call that omits
+ * it. See the comment inside synthesize() for the full explanation.
  * ==========================================
  */
 class EdgeTTSProvider extends BaseTTSProvider {
@@ -57,13 +56,40 @@ class EdgeTTSProvider extends BaseTTSProvider {
         return scriptCount >= latinCount ? scriptVoice : voiceConfig.voice.english;
     }
 
+    /**
+     * Derives the voice locale (e.g. "en-US") from a voice name like
+     * "en-US-AvaNeural". Every configured voice (English/Tamil/Japanese)
+     * follows this "xx-XX-NameNeural" naming scheme.
+     */
+    detectLocale(voiceName) {
+        const match = /^[a-zA-Z]{2}-[a-zA-Z]{2}/.exec(voiceName || "");
+        if (!match) {
+            throw new Error(`Could not determine voiceLocale from voice name "${voiceName}".`);
+        }
+        return match[0];
+    }
+
     async synthesize(options = {}) {
         const { text = "" } = options;
         const voice = this.detectVoice(text);
+        const voiceLocale = this.detectLocale(voice);
 
+        // BUG (msedge-tts v2.0.6/2.0.7, MsEdgeTTS.setMetadata):
+        // `if (!this._metadataOptions.voiceLocale || (!metadataOptions.voiceLocale && ...))`
+        // reads `metadataOptions.voiceLocale` without first checking that
+        // `metadataOptions` (the optional 3rd arg) was actually passed. Calling
+        // setMetadata(voice, outputFormat) with only two arguments - as this file
+        // previously did - makes `metadataOptions` `undefined`, so the library
+        // throws "TypeError: Cannot read properties of undefined (reading
+        // 'voiceLocale')" on every single call, before any audio is produced.
+        // This is a real bug in the installed dependency, not something we can
+        // fix by changing our own logic alone - the reliable workaround is to
+        // always pass an explicit metadataOptions object with voiceLocale set,
+        // so the library's own (buggy) inference branch is never reached.
         await this.tts.setMetadata(
             voice,
-            OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3
+            OUTPUT_FORMAT.AUDIO_24KHZ_96KBITRATE_MONO_MP3,
+            { voiceLocale }
         );
 
         const { audioStream } = await this.tts.toStream(text, {

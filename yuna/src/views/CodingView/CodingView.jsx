@@ -7,6 +7,7 @@ import {
 import CodingProvider from "../../providers/CodingProvider";
 import CodingSocketService from "../../services/codingSocketService";
 import useCodingStore from "../../store/codingStore";
+import useResizablePanel from "../../hooks/useResizablePanel";
 
 import WorkspaceBar from "../../components/Coding/WorkspaceBar";
 import FileExplorer from "../../components/Coding/FileExplorer";
@@ -16,6 +17,7 @@ import TerminalPanel from "../../components/Coding/TerminalPanel";
 import GitPanel from "../../components/Coding/GitPanel";
 import SessionHistory from "../../components/Coding/SessionHistory";
 import ApprovalDialog from "../../components/Coding/ApprovalDialog";
+import ResizeHandle from "../../components/Coding/ResizeHandle";
 
 import styles from "./codingView.module.css";
 
@@ -46,6 +48,23 @@ function CodingViewInner() {
     const [task, setTask] = useState("");
     const [historyOpen, setHistoryOpen] = useState(false);
     const [rightTab, setRightTab] = useState("agent");
+
+    // Real drag-to-resize, not fixed 260px/380px panels - widths persist
+    // per-user across reloads (see useResizablePanel's doc comment).
+    const explorerResize = useResizablePanel({
+        storageKey: "yuna:coding:explorerWidth",
+        defaultWidth: 260,
+        min: 180,
+        max: 480,
+        direction: "right"
+    });
+    const sideResize = useResizablePanel({
+        storageKey: "yuna:coding:sideWidth",
+        defaultWidth: 380,
+        min: 280,
+        max: 640,
+        direction: "left"
+    });
 
     useEffect(() => {
         let cancelled = false;
@@ -101,9 +120,11 @@ function CodingViewInner() {
             <WorkspaceBar task={task} onOpenHistory={() => setHistoryOpen(true)} />
 
             <div className={styles.body}>
-                <div className={styles.explorerPane}>
+                <div className={styles.explorerPane} style={{ width: explorerResize.width }}>
                     <FileExplorer />
                 </div>
+
+                <ResizeHandle onMouseDown={explorerResize.onMouseDown} isResizing={explorerResize.isResizing} />
 
                 <div className={styles.editorPane}>
                     {workspace.configured ? (
@@ -116,7 +137,9 @@ function CodingViewInner() {
                     )}
                 </div>
 
-                <div className={styles.sidePane}>
+                <ResizeHandle onMouseDown={sideResize.onMouseDown} isResizing={sideResize.isResizing} />
+
+                <div className={styles.sidePane} style={{ width: sideResize.width }}>
                     <Tabs
                         activeKey={rightTab}
                         onChange={setRightTab}

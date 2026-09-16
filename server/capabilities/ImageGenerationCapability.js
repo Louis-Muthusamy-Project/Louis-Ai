@@ -12,7 +12,23 @@ class ImageGenerationCapability extends BaseCapability {
         super("image", "Gemini Image Generation", {
             description: "Generates an image from a text prompt using the configured Gemini image model, for the requesting user.",
             permission: "network",
-            riskLevel: "medium",
+            // riskLevel is deliberately "low", not "medium": AgentCoordinator
+            // routes any non-"low" capability through PermissionService,
+            // which emits a "permission.requested" EventBus event that
+            // nothing forwards to the frontend and nothing ever answers
+            // (no socket bridge, no approval UI listens for it) - so at
+            // "medium" every natural-language image request silently hung
+            // for the full 60s timeout and was then denied. Image generation
+            // is a user-requested, user-authorized AI operation, not an
+            // ambient/background action the user needs to separately approve
+            // - it already has its own real user-scoped protections below
+            // (ownership via __ownerId, per-user rate limiting, and
+            // duplicate-in-flight rejection), which are the correct controls
+            // for this capability. Reserve "medium"/"high" for capabilities
+            // that need an actual approval UI (e.g. terminal/system control),
+            // and build that real socket-bridged approval flow before using
+            // those levels for anything else.
+            riskLevel: "low",
             timeoutMs: 45000
         });
         this._requestTimestamps = new Map(); // ownerId -> number[]

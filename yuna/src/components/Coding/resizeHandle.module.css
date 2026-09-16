@@ -1,0 +1,15 @@
+.handle {
+    flex-shrink: 0;
+    width: 6px;
+    margin: 0 -3px;
+    position: relative;
+    z-index: 5;
+    cursor: col-resize;
+    background: transparent;
+    transition: background 0.12s ease;
+}
+
+.handle:hover,
+.handle.active {
+    background: rgba(168, 85, 247, 0.35);
+}

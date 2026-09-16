@@ -6,7 +6,16 @@
 
     width:100%;
 
-    height:100vh;
+    /* Was height:100vh - this view renders INSIDE AppShell's .content,
+       which is already the remaining space after the title bar + nav
+       (see appShell.module.css: .content{flex:1; min-height:0}). Forcing
+       another 100vh here made ChatView taller than the box it was given,
+       so it overflowed the real window and pushed the composer/Send
+       button off-screen at smaller heights (e.g. 1318x606) - height:100%
+       instead makes it fill exactly the space it's actually given. */
+    height:100%;
+
+    min-height:0;
 
     overflow:hidden;
 
@@ -17,6 +26,8 @@
 .mainSplit{
 
     flex:1;
+
+    min-height:0;
 
     display:flex;
 

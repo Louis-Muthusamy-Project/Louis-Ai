@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Spin, Button } from 'antd';
-import { ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
+import { Button } from 'antd';
+import { PictureOutlined, ReloadOutlined, DownloadOutlined } from '@ant-design/icons';
 import styles from './chatMessageBubble.module.css';
+
+// Honest, rotating status text - these are stages of the real request
+// lifecycle (request sent -> waiting on the provider -> still waiting),
+// not a fabricated progress percentage. No backend progress events exist
+// for image generation, so we never show a number.
+const LOADING_STAGES = ['Creating your image...', 'Still working on it...', 'Almost there...'];
 
 import SocketService from '../../services/socketService';
 import useChatStore from '../../store/chatStore';
@@ -24,6 +30,32 @@ function downloadGeneratedImage(image) {
   document.body.removeChild(link);
 }
 
+function ImageGenerationCard({ prompt }) {
+  const [stageIndex, setStageIndex] = useState(0);
+
+  useEffect(() => {
+    // Advances the honest status line over time. Not tied to any real
+    // backend progress signal - it never implies a percentage or a
+    // guaranteed completion time, just that the request is still in
+    // flight. Stops advancing at the last stage rather than looping,
+    // so it doesn't look like it's stuck restarting.
+    if (stageIndex >= LOADING_STAGES.length - 1) return undefined;
+    const timer = setTimeout(() => setStageIndex((i) => i + 1), 6000);
+    return () => clearTimeout(timer);
+  }, [stageIndex]);
+
+  return (
+    <div className={styles.imageGenCard}>
+      <div className={styles.imageGenShimmer}>
+        <PictureOutlined className={styles.imageGenIcon} />
+      </div>
+      <div className={styles.imageGenLabel}>{LOADING_STAGES[stageIndex]}</div>
+      {prompt && <div className={styles.imageGenPrompt}>{prompt}</div>}
+      <div className={styles.imageGenProvider}>Gemini Image</div>
+    </div>
+  );
+}
+
 function ImagePayload({ message }) {
   const image = message.image;
   const updateMessage = useChatStore(state => state.updateMessage);
@@ -31,12 +63,7 @@ function ImagePayload({ message }) {
   if (!image) return null;
 
   if (image.status === 'loading') {
-    return (
-      <div className={styles.imageLoading}>
-        <Spin size="small" />
-        <span>Generating image...</span>
-      </div>
-    );
+    return <ImageGenerationCard prompt={image.prompt} />;
   }
 
   if (image.status === 'error') {
@@ -46,8 +73,13 @@ function ImagePayload({ message }) {
         <Button
           size="small"
           icon={<ReloadOutlined />}
+          // image.retrying guards against a double-click firing two
+          // generation requests for the same message before the first
+          // "loading" state has even rendered.
+          disabled={image.retrying}
           onClick={() => {
-            updateMessage(message.id, { image: { ...image, status: 'loading', error: null } });
+            if (image.retrying) return;
+            updateMessage(message.id, { image: { ...image, status: 'loading', error: null, retrying: true } });
             SocketService.emit('IMAGE_GENERATE', { prompt: image.prompt });
           }}
         >
