@@ -8,22 +8,41 @@ const geminiConfig = require("../config/gemini");
  * ==========================================
  */
 class GeminiProvider extends BaseAIProvider {
-    constructor(kernel) {
+    /**
+     * @param {object|import('../core/Kernel')} kernelOrOptions Legacy callers
+     *   pass the Kernel instance directly (back-compat, boot-time
+     *   ProviderManager path). New callers (ProviderManager.resolveForUser)
+     *   pass an explicit options object so each user's own decrypted
+     *   apiKey/model can be used, instead of this provider ever reading
+     *   process.env itself.
+     * @param {object} [options]
+     * @param {string} [options.apiKey] Falls back to process.env.GEMINI_API_KEY
+     *   ONLY when omitted, so the original boot-time singleton path (see
+     *   ProviderManager's constructor) keeps working unchanged.
+     * @param {string} [options.model]
+     * @param {string} [options.imageModel]
+     */
+    constructor(kernelOrOptions, options = {}) {
         super();
-        this.kernel = kernel;
 
-        if (!process.env.GEMINI_API_KEY) {
-            throw new Error("GEMINI_API_KEY is missing.");
+        const isKernel = kernelOrOptions && typeof kernelOrOptions.get === "function";
+        this.kernel = isKernel ? kernelOrOptions : null;
+        const opts = isKernel ? options : (kernelOrOptions || {});
+
+        const apiKey = opts.apiKey || process.env.GEMINI_API_KEY;
+        if (!apiKey) {
+            throw new Error("Gemini API key is missing.");
         }
 
         const timeoutMs = geminiConfig.timeout || 30000;
 
         this.client = new GoogleGenAI({
-            apiKey: process.env.GEMINI_API_KEY,
+            apiKey,
             httpOptions: { timeout: timeoutMs }
         });
 
-        this.model = geminiConfig.model;
+        this.model = opts.model || geminiConfig.model;
+        this.imageModel = opts.imageModel || geminiConfig.imageModel;
     }
 
     getName() {
@@ -131,7 +150,7 @@ class GeminiProvider extends BaseAIProvider {
 
         try {
             const response = await this.client.models.generateContent({
-                model: geminiConfig.imageModel,
+                model: this.imageModel,
                 contents: [{ role: "user", parts: [{ text: prompt }] }],
                 config: {
                     responseModalities: ["TEXT", "IMAGE"]
@@ -144,7 +163,7 @@ class GeminiProvider extends BaseAIProvider {
             if (!imagePart) {
                 throw new Error(
                     "Gemini did not return image data. The configured model " +
-                    `(${geminiConfig.imageModel}) may not be enabled for this API key, ` +
+                    `(${this.imageModel}) may not be enabled for this API key, ` +
                     "or the request may have been blocked by safety filters."
                 );
             }

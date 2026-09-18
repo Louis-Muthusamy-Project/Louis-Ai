@@ -86,9 +86,15 @@ class AIOrchestrator {
                 }
             ];
 
-            // 7. Run generation with Retry System
+            // 7. Resolve THIS user's own configured Gemini credential (never
+            // the boot-time env-based singleton) and run generation with
+            // Retry System. Throws a clear config error, uncaught here, if
+            // the user hasn't added a Gemini key in Settings - handled by
+            // the outer catch below via FallbackSystem, same as any other
+            // provider failure.
+            const chatProvider = await this.providerManager.resolveForUser(socketId, "gemini", "chat");
             const reply = await RetrySystem.execute(async () => {
-                return await this.providerManager.generate(contents);
+                return await chatProvider.generate(contents);
             }, {
                 maxAttempts: 3,
                 delay: 1000,
@@ -209,9 +215,18 @@ class AIOrchestrator {
             const backoffFactor = 2;
             const timeoutMs = 30000;
 
+            // Resolve THIS user's own configured Gemini credential ONCE,
+            // outside the retry loop (see providerCredentialService.js /
+            // ProviderManager.resolveForUser) - never the boot-time
+            // env-based singleton. A missing/disabled config throws here
+            // immediately rather than being retried 3 times with backoff;
+            // the outer catch converts it into an honest fallback response
+            // (error.message is preserved in the fallback payload).
+            const chatProvider = await this.providerManager.resolveForUser(socketId, "gemini", "chat");
+
             for (let attempt = 1; attempt <= maxAttempts; attempt++) {
                 try {
-                    const streamPromise = this.providerManager.stream(contents, {
+                    const streamPromise = chatProvider.stream(contents, {
                         onStart: async () => {
                             if (typeof onStart === "function") await onStart();
                         },

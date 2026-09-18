@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 
-function makeCapability(providerManagerOverrides = {}) {
+function makeCapability(generateImageOverride) {
     // Fresh instance per test (module.exports is a singleton, so require
     // a fresh copy of the class isn't trivial) - reuse the exported
     // singleton but reset its internal rate-limit/in-flight state so
@@ -10,9 +10,19 @@ function makeCapability(providerManagerOverrides = {}) {
     capability._requestTimestamps = new Map();
     capability._inFlight = new Set();
     capability.eventBus = null; // no socket bridge needed for these tests
+
+    // As of the per-user encrypted provider credential migration (see
+    // providerCredentialService.js), the capability resolves a
+    // FRESH per-user provider via providerManager.resolveForUser() and
+    // then calls THAT provider's generateImage() - it no longer calls
+    // providerManager.generateImage() directly. Mock resolveForUser to
+    // return a stub provider exposing generateImage, same shape as the
+    // real GeminiProvider.
+    const generateImage = generateImageOverride ||
+        (async () => ({ data: "ZmFrZS1pbWFnZS1ieXRlcw==", mimeType: "image/png" }));
+
     capability.providerManager = {
-        generateImage: async (prompt) => ({ data: "ZmFrZS1pbWFnZS1ieXRlcw==", mimeType: "image/png" }),
-        ...providerManagerOverrides
+        resolveForUser: async () => ({ generateImage })
     };
     return capability;
 }
@@ -40,18 +50,18 @@ test("ImageGenerationCapability: never trusts a client-supplied ownerId inside p
 });
 
 test("ImageGenerationCapability: rejects an empty prompt without calling the provider", async () => {
-    const cap = makeCapability({
-        generateImage: async () => { throw new Error("should not be called"); }
-    });
+    const cap = makeCapability(
+        async () => { throw new Error("should not be called"); }
+    );
     const result = await cap.generate("user-1", "   ");
     assert.equal(result.success, false);
     assert.match(result.message, /prompt is required/i);
 });
 
 test("ImageGenerationCapability: a provider failure returns a structured error, never a fake success", async () => {
-    const cap = makeCapability({
-        generateImage: async () => { throw new Error("model not enabled for this API key"); }
-    });
+    const cap = makeCapability(
+        async () => { throw new Error("model not enabled for this API key"); }
+    );
     const result = await cap.generate("user-1", "a dragon");
     assert.equal(result.success, false);
     assert.match(result.message, /model not enabled/i);
@@ -67,9 +77,9 @@ test("ImageGenerationCapability: a successful generation never includes a filesy
 
 test("ImageGenerationCapability: prevents a second concurrent request for the SAME user while one is in flight", async () => {
     let resolveFirst;
-    const cap = makeCapability({
-        generateImage: () => new Promise((resolve) => { resolveFirst = resolve; })
-    });
+    const cap = makeCapability(
+        () => new Promise((resolve) => { resolveFirst = resolve; })
+    );
 
     const first = cap.generate("user-1", "first prompt");
     // Give the first call a tick to register itself as in-flight.
@@ -87,12 +97,12 @@ test("ImageGenerationCapability: prevents a second concurrent request for the SA
 test("ImageGenerationCapability: does NOT block a different user while one user's request is in flight", async () => {
     let resolveA;
     let resolveB;
-    const cap = makeCapability({
-        generateImage: (prompt) => new Promise((resolve) => {
+    const cap = makeCapability(
+        (prompt) => new Promise((resolve) => {
             if (prompt === "prompt A") resolveA = resolve;
             else resolveB = resolve;
         })
-    });
+    );
 
     const first = cap.generate("user-a", "prompt A");
     await new Promise((r) => setTimeout(r, 5));

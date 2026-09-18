@@ -17,13 +17,22 @@ const anthropicConfig = require("../config/anthropic");
  * ==========================================
  */
 class AnthropicProvider extends BaseAIProvider {
-    constructor() {
+    /**
+     * @param {object} [options] Explicit per-user credentials (see
+     *   ProviderManager.resolveForUser). When omitted, falls back to
+     *   process.env.ANTHROPIC_API_KEY for the legacy boot-time singleton
+     *   path only.
+     * @param {string} [options.apiKey]
+     * @param {string} [options.model]
+     */
+    constructor(options = {}) {
         super();
-        if (!process.env.ANTHROPIC_API_KEY) {
-            throw new Error("ANTHROPIC_API_KEY is missing.");
+        const apiKey = options.apiKey || process.env.ANTHROPIC_API_KEY;
+        if (!apiKey) {
+            throw new Error("Anthropic API key is missing.");
         }
-        this.client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY, timeout: anthropicConfig.timeout });
-        this.model = anthropicConfig.model;
+        this.client = new Anthropic({ apiKey, timeout: anthropicConfig.timeout });
+        this.model = options.model || anthropicConfig.model;
     }
 
     getName() {

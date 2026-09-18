@@ -22,6 +22,7 @@ const { AuthService } = require("./services/authService");
 const { PasswordResetService } = require("./services/passwordResetService");
 const emailService = require("./services/emailService");
 const { SettingsService } = require("./services/settingsService");
+const { ProviderCredentialService } = require("./services/providerCredentialService");
 const { ConversationService } = require("./services/conversationService");
 const { MemoryService } = require("./services/memoryService");
 const { ContextService } = require("./services/contextService");
@@ -75,6 +76,7 @@ function registerBindings() {
     Kernel.register("authService", new AuthService(Kernel));
     Kernel.register("passwordResetService", new PasswordResetService(Kernel));
     Kernel.register("settingsService", SettingsService);
+    Kernel.register("providerCredentialService", ProviderCredentialService);
     Kernel.register("conversationService", ConversationService);
     Kernel.register("memoryService", MemoryService);
     Kernel.register("contextService", ContextService);

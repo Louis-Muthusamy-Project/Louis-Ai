@@ -138,6 +138,53 @@ class ProviderManager {
         }
         throw new Error("Active AI provider does not support image generation.");
     }
+
+    /**
+     * Resolves a FRESH provider instance built from ONE authenticated
+     * user's own encrypted Settings credential, for one capability
+     * (chat/prompt/image/embedding/coding). This is the per-user-aware
+     * counterpart to the legacy `.provider` singleton above (which is
+     * still constructed once at boot from process.env, for call sites
+     * not yet migrated to this - see ProviderManager's constructor
+     * comments and the yuna-project migration notes).
+     *
+     * Deliberately NOT cached/reused across calls or users: constructing
+     * a provider is cheap (no network call), and caching per-user
+     * instances in a shared Map would risk one user's decrypted client
+     * lingering in memory or, with a bug, being handed to another
+     * user's request. The decrypted API key exists only for the
+     * lifetime of this call's provider instance.
+     *
+     * Throws a clear configuration error (never a silent env fallback)
+     * if the user has not configured this provider.
+     *
+     * @param {string} userId
+     * @param {"gemini"|"openai"|"claude"} providerName
+     * @param {"chat"|"prompt"|"image"|"embedding"|"coding"} capability
+     */
+    async resolveForUser(userId, providerName, capability) {
+        if (!userId) {
+            throw new Error("resolveForUser requires an authenticated userId.");
+        }
+
+        const providerCredentialService = this.kernel.get("providerCredentialService");
+        const { apiKey, model, imageModel } = await providerCredentialService.resolveCredential(
+            userId,
+            providerName,
+            capability
+        );
+
+        if (providerName === "gemini") {
+            return new GeminiProvider({ apiKey, model, imageModel });
+        }
+        if (providerName === "openai") {
+            return new OpenAIProvider({ apiKey, model });
+        }
+        if (providerName === "claude") {
+            return new AnthropicProvider({ apiKey, model });
+        }
+        throw new Error(`Unknown AI provider: "${providerName}".`);
+    }
 }
 
 module.exports = ProviderManager;

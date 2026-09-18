@@ -93,7 +93,13 @@ class ImageGenerationCapability extends BaseCapability {
         this._inFlight.add(ownerId);
         if (this.eventBus) this.eventBus.emit("image:start", { ownerId, prompt });
         try {
-            const result = await this.providerManager.generateImage(prompt);
+            // Resolve THIS user's own configured Gemini credential/image
+            // model (never the boot-time env-based singleton) - see
+            // ProviderManager.resolveForUser / providerCredentialService.js.
+            // Throws a clear config error if the user hasn't added a
+            // Gemini key in Settings, caught below like any other failure.
+            const provider = await this.providerManager.resolveForUser(ownerId, "gemini", "image");
+            const result = await provider.generateImage(prompt);
             const payload = {
                 success: true,
                 // base64 image data only - never a filesystem path, never
