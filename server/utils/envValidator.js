@@ -1,9 +1,16 @@
 
 
 const REQUIRED_ENV = [
-    "GEMINI_API_KEY",
     "JWT_SECRET"
 ];
+
+// Provider API keys (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)
+// are DELIBERATELY not required here. Per the API-key architecture, provider
+// keys are never a boot-time/env dependency - each user supplies their own
+// key from Settings -> AI Providers, encrypted per-user in the database
+// (see providerCredentialService.js). The app must boot cleanly with zero
+// provider keys configured anywhere. JWT_SECRET remains required because it
+// is genuine infrastructure (auth token signing), not a provider credential.
 
 function validateEnvironment() {
 

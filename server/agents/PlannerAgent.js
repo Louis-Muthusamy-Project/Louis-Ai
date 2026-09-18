@@ -17,7 +17,15 @@ class PlannerAgent extends BaseAgent {
             if (action === "create_plan") {
                 try {
                     const text = params.text;
-                    const detectionResult = await intentDetector.detect(text);
+                    // NOTE: this event is not emitted anywhere in the live codebase
+                    // (dead code path, see the pre-existing note below) - userId is
+                    // threaded through best-effort so this doesn't silently break if
+                    // something ever does wire it up. intentDetector/taskPlanner both
+                    // require an authenticated userId to resolve a per-user provider
+                    // credential (see ProviderManager.resolveForUser) - never the
+                    // boot-time env-based singleton.
+                    const userId = payload.userId || payload.ownerId;
+                    const detectionResult = await intentDetector.detect(text, userId);
                     
                     if (!detectionResult.requiresTool || detectionResult.intent === "conversation" || detectionResult.intent === "question") {
                         // Direct reply, no tools needed
@@ -34,7 +42,7 @@ class PlannerAgent extends BaseAgent {
                     // and then read step.tool (the field is actually step.capability),
                     // meaning this whole non-conversational path always threw before
                     // reaching any agent/capability. Both are fixed here.
-                    const plan = await taskPlanner.plan({}, detectionResult);
+                    const plan = await taskPlanner.plan({}, detectionResult, userId);
 
                     const agentSteps = plan.steps.map(step => {
                         let agent = "Executor";

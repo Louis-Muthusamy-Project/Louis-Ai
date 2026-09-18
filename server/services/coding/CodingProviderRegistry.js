@@ -12,15 +12,12 @@ const ClaudeCodingProvider = require("./ClaudeCodingProvider");
  * for actually constructing the right CodingModelProvider adapter for a
  * task.
  *
- * All three adapters are now genuinely implemented (Gemini via
- * @google/genai native function calling, OpenAI via the Responses API,
- * Claude via the Messages API's native tool use). Availability is
- * therefore purely a function of whether ProviderManager actually
- * registered that provider - which itself only happens when the
- * corresponding API key env var was present at startup (see
- * ProviderManager's constructor). Enabled here is never based on "the SDK
- * package is installed" - only on an actually-constructed, keyed provider
- * instance existing.
+ * Per-user, per the API-key architecture: availability and provider
+ * construction are both scoped to ONE authenticated user's own encrypted
+ * Settings credential (see providerCredentialService.js /
+ * ProviderManager.resolveForUser) - never the boot-time env-based
+ * singleton, never shared across users. User A's coding-provider status
+ * and User B's are computed independently from their own stored records.
  * ==========================================
  */
 class CodingProviderRegistry {
@@ -28,40 +25,49 @@ class CodingProviderRegistry {
         this.providerManager = providerManager;
     }
 
+    get providerCredentialService() {
+        return this.providerManager.kernel.get("providerCredentialService");
+    }
+
     /**
+     * @param {string} userId authenticated user id - never client-supplied
      * @returns {Array<{name: string, label: string, enabled: boolean, reason?: string, model?: string}>}
      */
-    getProviderStatus() {
+    getProviderStatus(userId) {
+        if (!userId) {
+            throw new Error("CodingProviderRegistry.getProviderStatus requires an authenticated userId.");
+        }
         return [
-            this._statusFor("gemini", "Gemini"),
-            this._statusFor("openai", "ChatGPT"),
-            this._statusFor("claude", "Claude")
+            this._statusFor(userId, "gemini", "Gemini"),
+            this._statusFor(userId, "openai", "ChatGPT"),
+            this._statusFor(userId, "claude", "Claude")
         ];
     }
 
-    _statusFor(name, label) {
-        const rawProvider = this.providerManager.getRawProvider(name);
-        const registered = !!rawProvider;
+    _statusFor(userId, name, label) {
+        // getStatus is a cheap, synchronous, non-secret read (masked key
+        // only, never decrypted) - safe to call just to show UI status.
+        const status = this.providerCredentialService.getStatus(userId, name);
+        const enabled = !!(status.hasKey && status.enabled);
         return {
             name,
             label,
-            enabled: registered,
-            reason: registered ? undefined : "API key not configured",
-            // Each raw provider's own .model is whatever its config file
-            // resolved (env override or default - see config/openai.js /
-            // config/anthropic.js / config/gemini.js) - a real configured
-            // value, not a hardcoded list, since none of these backends
-            // currently support picking a model per request.
-            model: registered ? rawProvider.model : undefined
+            enabled,
+            reason: enabled ? undefined : (status.hasKey ? "Provider is disabled" : "API key not configured"),
+            model: enabled ? (status.models && status.models.coding) : undefined
         };
     }
 
     /**
+     * @param {string} userId authenticated user id - never client-supplied
      * @param {"gemini"|"openai"|"claude"} name
-     * @returns {import('./CodingModelProvider')}
+     * @returns {Promise<import('./CodingModelProvider')>}
      */
-    getCodingProvider(name) {
-        const status = this.getProviderStatus().find((p) => p.name === name);
+    async getCodingProvider(userId, name) {
+        if (!userId) {
+            throw new Error("CodingProviderRegistry.getCodingProvider requires an authenticated userId.");
+        }
+        const status = this.getProviderStatus(userId).find((p) => p.name === name);
         if (!status) {
             throw new Error(`Unknown coding provider: ${name}`);
         }
@@ -69,7 +75,9 @@ class CodingProviderRegistry {
             throw new Error(`Coding provider "${status.label}" is not available: ${status.reason}`);
         }
 
-        const rawProvider = this.providerManager.getRawProvider(name);
+        // Resolves THIS user's own decrypted credential and builds a fresh,
+        // never-cached provider instance - see ProviderManager.resolveForUser.
+        const rawProvider = await this.providerManager.resolveForUser(userId, name, "coding");
 
         switch (name) {
             case "gemini":

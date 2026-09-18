@@ -20,7 +20,7 @@ function makeMemoryService() {
     repo.dataRoot = isolatedRoot("memroot");
 
     let embedCounter = 0;
-    const fakeProviderManager = {
+    const fakeEmbeddingProvider = {
         // Deterministic, distinct-enough embeddings so cosineSimilarity
         // in cleanupMemories doesn't treat unrelated test memories as
         // duplicates of each other.
@@ -29,9 +29,16 @@ function makeMemoryService() {
             const v = new Array(8).fill(0);
             v[embedCounter % 8] = 1;
             return v;
-        },
+        }
+    };
+    const fakeChatProvider = {
         async generate() {
             return "5"; // importance score
+        }
+    };
+    const fakeProviderManager = {
+        async resolveForUser(userId, provider, capability) {
+            return capability === "embedding" ? fakeEmbeddingProvider : fakeChatProvider;
         }
     };
 

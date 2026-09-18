@@ -42,7 +42,7 @@ const SUPPORTED_PROVIDERS = ["gemini", "openai", "claude"];
 // existed, so a user who hasn't touched Settings yet still gets a
 // sensible default model once they add a key.
 const PROVIDER_CAPABILITIES = {
-    gemini: ["chat", "prompt", "image", "embedding", "coding"],
+    gemini: ["chat", "prompt", "image", "embedding", "coding", "vision"],
     openai: ["prompt", "coding"],
     claude: ["prompt", "coding"]
 };
@@ -55,7 +55,8 @@ function _defaultModelsFor(provider) {
             prompt: geminiConfig.model,
             image: geminiConfig.imageModel,
             embedding: geminiConfig.model,
-            coding: geminiConfig.model
+            coding: geminiConfig.model,
+            vision: geminiConfig.visionModel || "gemini-2.5-flash"
         };
     }
     if (provider === "openai") {
@@ -68,15 +69,6 @@ function _defaultModelsFor(provider) {
     }
     return {};
 }
-
-// Maps a provider name to the env var it used to be configured from,
-// used ONLY for the one-time best-effort migration below - never read
-// again after a user has a stored (or explicitly absent) credential.
-const ENV_KEY_BY_PROVIDER = {
-    gemini: "GEMINI_API_KEY",
-    openai: "OPENAI_API_KEY",
-    claude: "ANTHROPIC_API_KEY"
-};
 
 class ProviderCredentialService {
     constructor(kernel) {
@@ -117,36 +109,6 @@ class ProviderCredentialService {
         const settings = this.store.read(userId) || {};
         settings.providerCredentials = providerCredentials;
         await this.store.write(userId, settings);
-    }
-
-    /**
-     * One-time, best-effort import of an existing environment-configured
-     * API key into this user's encrypted Settings record, mirroring the
-     * exact pattern SettingsFileStore already uses for legacy global
-     * settings.json. Only runs when the user has NO stored record yet
-     * for this provider (including no explicit "removed" state) - once a
-     * user has any record (even a deliberately empty/disabled one), the
-     * environment variable is never consulted again for them.
-     */
-    async migrateFromEnvIfNeeded(userId, provider) {
-        this._requireUserId(userId);
-        this._requireProvider(provider);
-
-        const all = this._readAll(userId);
-        if (all[provider]) return; // already has (or explicitly lacks) a record
-
-        const envKey = process.env[ENV_KEY_BY_PROVIDER[provider]];
-        if (!envKey || !envKey.trim()) return;
-
-        try {
-            await this.setApiKey(userId, provider, envKey.trim());
-            console.log(
-                `[ProviderCredentialService] Migrated existing ${ENV_KEY_BY_PROVIDER[provider]} ` +
-                `into encrypted per-user Settings for the first authenticated user (${provider}).`
-            );
-        } catch (error) {
-            console.error(`[ProviderCredentialService] Env migration failed for ${provider}:`, error.message);
-        }
     }
 
     /**
@@ -247,8 +209,9 @@ class ProviderCredentialService {
         this._requireProvider(provider);
 
         const all = this._readAll(userId);
-        // Explicitly recorded as "no key" (not just absent) so
-        // migrateFromEnvIfNeeded never re-imports a removed key.
+        // Explicitly recorded as "no key" (not just absent) - there is no
+        // env-based migration/fallback anywhere in this class, so this
+        // distinction is purely for a clean, explicit UI/audit state.
         all[provider] = {
             apiKeyEncrypted: null,
             maskedKey: null,
@@ -265,13 +228,14 @@ class ProviderCredentialService {
      * provider. Server-internal only (see file header) - never expose
      * this method's return value through a route or socket event.
      * Throws a clear, non-leaking configuration error if unavailable,
-     * rather than silently falling back to anything.
+     * rather than silently falling back to anything - including
+     * process.env. Provider API keys are NEVER read from environment
+     * variables anywhere in this class; the only way a key gets here is
+     * a user explicitly saving it via Settings -> AI Providers (setApiKey).
      */
     async resolveCredential(userId, provider, capability) {
         this._requireUserId(userId);
         this._requireProvider(provider);
-
-        await this.migrateFromEnvIfNeeded(userId, provider);
 
         const all = this._readAll(userId);
         const record = all[provider];

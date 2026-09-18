@@ -39,7 +39,7 @@ class AIOrchestrator {
             this.memoryService.addShortMemory(socketId, "user", userMessage);
 
             // 3. Run Intent Detection
-            const intentResult = await this.intentDetector.detect(userMessage);
+            const intentResult = await this.intentDetector.detect(userMessage, socketId);
 
             // 4. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);
@@ -162,7 +162,7 @@ class AIOrchestrator {
             this.memoryService.addShortMemory(socketId, "user", userMessage);
 
             // 3. Run Intent Detection
-            const intentResult = await this.intentDetector.detect(userMessage);
+            const intentResult = await this.intentDetector.detect(userMessage, socketId);
 
             // 4. Context Building
             const cognitiveMemory = await this.memoryService.retrieveContextMemories(socketId, userMessage);

@@ -9,29 +9,20 @@ const geminiConfig = require("../config/gemini");
  */
 class GeminiProvider extends BaseAIProvider {
     /**
-     * @param {object|import('../core/Kernel')} kernelOrOptions Legacy callers
-     *   pass the Kernel instance directly (back-compat, boot-time
-     *   ProviderManager path). New callers (ProviderManager.resolveForUser)
-     *   pass an explicit options object so each user's own decrypted
-     *   apiKey/model can be used, instead of this provider ever reading
-     *   process.env itself.
-     * @param {object} [options]
-     * @param {string} [options.apiKey] Falls back to process.env.GEMINI_API_KEY
-     *   ONLY when omitted, so the original boot-time singleton path (see
-     *   ProviderManager's constructor) keeps working unchanged.
+     * @param {object} options Explicit, required credential/config - this
+     *   provider NEVER reads process.env itself. Callers (only
+     *   ProviderManager.resolveForUser) must resolve ONE user's own
+     *   decrypted credential first and pass it in here.
+     * @param {string} options.apiKey Required. No environment fallback.
      * @param {string} [options.model]
      * @param {string} [options.imageModel]
      */
-    constructor(kernelOrOptions, options = {}) {
+    constructor(options = {}) {
         super();
 
-        const isKernel = kernelOrOptions && typeof kernelOrOptions.get === "function";
-        this.kernel = isKernel ? kernelOrOptions : null;
-        const opts = isKernel ? options : (kernelOrOptions || {});
-
-        const apiKey = opts.apiKey || process.env.GEMINI_API_KEY;
+        const apiKey = options.apiKey;
         if (!apiKey) {
-            throw new Error("Gemini API key is missing.");
+            throw new Error("Gemini API key is missing. GeminiProvider must be constructed with an explicit apiKey - it never reads environment variables.");
         }
 
         const timeoutMs = geminiConfig.timeout || 30000;
@@ -41,8 +32,8 @@ class GeminiProvider extends BaseAIProvider {
             httpOptions: { timeout: timeoutMs }
         });
 
-        this.model = opts.model || geminiConfig.model;
-        this.imageModel = opts.imageModel || geminiConfig.imageModel;
+        this.model = options.model || geminiConfig.model;
+        this.imageModel = options.imageModel || geminiConfig.imageModel;
     }
 
     getName() {

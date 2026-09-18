@@ -17,9 +17,12 @@ class IntentDetector {
     /**
      * Determines the intent of a user message.
      * @param {string} text Incoming user text
+     * @param {string} userId Authenticated owner - resolves THIS user's own
+     *   configured Gemini credential (never the boot-time env-based
+     *   singleton). Required; classification cannot run without it.
      * @returns {Promise<Object>} Object { intent, tool, args }
      */
-    async detect(text) {
+    async detect(text, userId) {
         if (!text || !text.trim()) {
             return { intent: "CHAT", tool: null, args: null };
         }
@@ -76,7 +79,8 @@ Response MUST be JSON only. No explanation. No markdown codeblocks.`;
                 }
             ];
 
-            const reply = await this.providerManager.generate(contents);
+            const provider = await this.providerManager.resolveForUser(userId, "gemini", "chat");
+            const reply = await provider.generate(contents);
             
             // Clean JSON string
             let jsonText = reply.trim();

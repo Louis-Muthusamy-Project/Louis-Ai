@@ -23,18 +23,17 @@ const openaiConfig = require("../config/openai");
  */
 class OpenAIProvider extends BaseAIProvider {
     /**
-     * @param {object} [options] Explicit per-user credentials (see
-     *   ProviderManager.resolveForUser). When omitted, falls back to
-     *   process.env.OPENAI_API_KEY for the legacy boot-time singleton
-     *   path only.
-     * @param {string} [options.apiKey]
+     * @param {object} options Explicit, required credential/config - this
+     *   provider NEVER reads process.env itself (see
+     *   ProviderManager.resolveForUser).
+     * @param {string} options.apiKey Required. No environment fallback.
      * @param {string} [options.model]
      */
     constructor(options = {}) {
         super();
-        const apiKey = options.apiKey || process.env.OPENAI_API_KEY;
+        const apiKey = options.apiKey;
         if (!apiKey) {
-            throw new Error("OpenAI API key is missing.");
+            throw new Error("OpenAI API key is missing. OpenAIProvider must be constructed with an explicit apiKey - it never reads environment variables.");
         }
         this.client = new OpenAI({ apiKey, timeout: openaiConfig.timeout });
         this.model = options.model || openaiConfig.model;

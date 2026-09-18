@@ -20,7 +20,11 @@ class CodingCapability extends BaseCapability {
     }
 
     async execute(input = {}) {
-        const { action, params = {} } = input;
+        const { action, params = {}, __ownerId } = input;
+
+        if (!__ownerId) {
+            return { success: false, message: "Internal error: coding capability invoked without an owning user." };
+        }
 
         switch (action) {
             case "runCommand":
@@ -28,13 +32,13 @@ class CodingCapability extends BaseCapability {
             case "openInVSCode":
                 return this.openInVSCode(params.filePath);
             case "reviewCode":
-                return this.reviewCode(params.fileContent);
+                return this.reviewCode(__ownerId, params.fileContent);
             case "generateDocumentation":
-                return this.generateDocumentation(params.fileContent);
+                return this.generateDocumentation(__ownerId, params.fileContent);
             case "analyzeError":
-                return this.analyzeError(params.errorText);
+                return this.analyzeError(__ownerId, params.errorText);
             case "reviewArchitecture":
-                return this.reviewArchitecture(params.context);
+                return this.reviewArchitecture(__ownerId, params.context);
             default:
                 return { success: false, message: `Unknown coding action: ${action}` };
         }
@@ -66,12 +70,14 @@ class CodingCapability extends BaseCapability {
     }
 
     // 3. AI Tasks (Review, Docs, Error Analysis, Patch)
-    async _generateWithAI(prompt) {
-        if (!this.providerManager) {
-            return { success: false, message: "Provider Manager not initialized in CodingCapability." };
-        }
+    // Resolves THIS user's own configured provider credential (never the
+    // boot-time env-based singleton) for the "coding" capability, mirroring
+    // the pattern used by AIOrchestrator/memoryService/intentDetector/
+    // taskPlanner - see ProviderManager.resolveForUser.
+    async _generateWithAI(userId, prompt) {
         try {
-            const reply = await this.providerManager.generate([
+            const provider = await this.providerManager.resolveForUser(userId, "gemini", "coding");
+            const reply = await provider.generate([
                 { role: "user", parts: [{ text: prompt }] }
             ]);
             return { success: true, text: reply };
@@ -80,24 +86,24 @@ class CodingCapability extends BaseCapability {
         }
     }
 
-    async reviewCode(fileContent) {
+    async reviewCode(userId, fileContent) {
         const prompt = `Review the following code for bugs, security issues, performance, and best practices. Provide your response in Markdown.\n\nCode:\n\`\`\`\n${fileContent}\n\`\`\``;
-        return this._generateWithAI(prompt);
+        return this._generateWithAI(userId, prompt);
     }
 
-    async generateDocumentation(fileContent) {
+    async generateDocumentation(userId, fileContent) {
         const prompt = `Generate comprehensive Markdown documentation for the following code.\n\nCode:\n\`\`\`\n${fileContent}\n\`\`\``;
-        return this._generateWithAI(prompt);
+        return this._generateWithAI(userId, prompt);
     }
 
-    async analyzeError(errorText) {
+    async analyzeError(userId, errorText) {
         const prompt = `Analyze the following error message/stack trace and explain the likely root cause. Propose a solution.\n\nError:\n\`\`\`\n${errorText}\n\`\`\``;
-        return this._generateWithAI(prompt);
+        return this._generateWithAI(userId, prompt);
     }
 
-    async reviewArchitecture(context) {
+    async reviewArchitecture(userId, context) {
         const prompt = `Review the following architectural context and provide insights, potential bottlenecks, and suggestions for improvement.\n\nContext:\n\`\`\`\n${context}\n\`\`\``;
-        return this._generateWithAI(prompt);
+        return this._generateWithAI(userId, prompt);
     }
 }
 

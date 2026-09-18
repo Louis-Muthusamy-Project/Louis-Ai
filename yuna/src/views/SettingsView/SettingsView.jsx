@@ -8,6 +8,7 @@ import useSettingsStore from "../../store/settingsStore";
 import useAuthStore from "../../store/authStore";
 import SystemInfo from "../../components/System/SystemInfo";
 import WakeSettingsPanel from "../../components/Settings/WakeSettingsPanel";
+import AiProvidersPanel from "../../components/Settings/AiProvidersPanel";
 
 import styles from "./settingsView.module.css";
 
@@ -131,6 +132,11 @@ export default function SettingsView() {
             key: "wake",
             label: "Wake Word",
             children: <WakeSettingsPanel />
+        },
+        {
+            key: "ai-providers",
+            label: "AI Providers",
+            children: <AiProvidersPanel />
         },
         {
             key: "features",

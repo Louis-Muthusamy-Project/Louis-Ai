@@ -22,7 +22,7 @@ class ClaudeCodingProvider extends CodingModelProvider {
     }
 
     isConfigured() {
-        return !!(this.anthropicProvider && process.env.ANTHROPIC_API_KEY);
+        return !!(this.anthropicProvider);
     }
 
     buildInitialHistory(taskText, systemInstruction) {

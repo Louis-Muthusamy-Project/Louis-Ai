@@ -14,7 +14,6 @@ Yuna is a scalable, modular, production-ready AI Companion platform designed for
 ### 1. Prerequisites
 - Node.js (v18 or higher)
 - NPM or Yarn
-- Valid API keys (e.g. Google Gemini API)
 
 ### 2. Installation
 Clone the repository, then install both server and client dependencies:
@@ -30,12 +29,17 @@ npm install
 ```
 
 ### 3. Environment Variables
-Create a `.env` file in the `server` directory and add your keys:
+Create a `.env` file in the `server` directory:
 ```env
 PORT=3000
 NODE_ENV=development
-GEMINI_API_KEY=your_api_key_here
+JWT_SECRET=replace_with_a_long_random_secret
 ```
+AI provider API keys (Gemini, OpenAI, Claude) are **never** configured via
+`.env`. The server boots and runs with none set. Each user adds their own
+key from inside the app: **Settings → AI Providers**. Keys are encrypted
+at rest, scoped per user/provider, and never appear in `.env`, logs, or
+frontend responses.
 
 ### 4. Running the Platform
 Start the server and the Electron app:

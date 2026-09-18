@@ -135,10 +135,11 @@ class MemoryService {
     // Save Long-term Memory item
     async saveLongTermMemory(userId, text, category = "general", importance = null) {
         try {
-            const embedding = await this.providerManager.embed(text);
+            const embeddingProvider = await this.providerManager.resolveForUser(userId, "gemini", "embedding");
+            const embedding = await embeddingProvider.embed(text);
 
             if (importance === null) {
-                importance = await this.scoreImportance(text);
+                importance = await this.scoreImportance(userId, text);
             }
 
             const item = new MemoryItem({
@@ -167,11 +168,12 @@ class MemoryService {
     }
 
     // Score importance using Gemini
-    async scoreImportance(text) {
+    async scoreImportance(userId, text) {
         try {
             const prompt = `Analyze this memory statement and rate its importance on a scale of 1 to 10 (1 is completely trivial like greeting, 10 is a core fact about user's identity, preferences, relationships, or life goals). Respond with ONLY the number.
 Memory: "${text}"`;
-            const response = await this.providerManager.generate([
+            const provider = await this.providerManager.resolveForUser(userId, "gemini", "chat");
+            const response = await provider.generate([
                 { role: "user", parts: [{ text: prompt }] }
             ]);
             const score = parseInt(response.trim(), 10);
@@ -184,7 +186,8 @@ Memory: "${text}"`;
     // Semantic Vector Search
     async searchSemanticMemory(userId, query, limit = 5, minSimilarity = 0.65) {
         try {
-            const queryEmbedding = await this.providerManager.embed(query);
+            const embeddingProvider = await this.providerManager.resolveForUser(userId, "gemini", "embedding");
+            const queryEmbedding = await embeddingProvider.embed(query);
             const memories = await this.repository.readMemories(userId);
 
             const scored = memories
@@ -325,7 +328,8 @@ No markdown. No code blocks. Respond with JSON only.`;
                 }
             ];
 
-            const reply = await this.providerManager.generate(contents);
+            const provider = await this.providerManager.resolveForUser(userId, "gemini", "chat");
+            const reply = await provider.generate(contents);
 
             let jsonText = reply.trim();
             if (jsonText.startsWith("```json")) {

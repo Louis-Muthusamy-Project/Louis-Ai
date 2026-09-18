@@ -113,7 +113,7 @@ test("full e2e: two real signed-up users get fully isolated settings, memory, an
 
         // ── Memory, via the real MemoryService keyed on the real JWT-derived id ──
         const memSvc = Kernel.get("memoryService");
-        Object.defineProperty(memSvc, "providerManager", { get: () => ({ embed: async () => [1, 0], generate: async () => "5" }) });
+        Object.defineProperty(memSvc, "providerManager", { get: () => ({ resolveForUser: async () => ({ embed: async () => [1, 0], generate: async () => "5" }) }) });
 
         await memSvc.saveLongTermMemory(userA.userId, "User A's private fact", "general", 5);
         await memSvc.saveLongTermMemory(userB.userId, "User B's private fact", "general", 5);

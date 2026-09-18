@@ -28,15 +28,18 @@ test("taskPlanner: conversation/question intents never produce a plan step", asy
 
 test("taskPlanner's prompt only advertises capability ids that are ACTUALLY registered in CapabilityRegistry", async () => {
     let capturedPrompt = null;
-    const fakeProviderManager = {
+    const fakeProvider = {
         generate: async (contents) => {
             capturedPrompt = contents[0].parts[0].text;
             return JSON.stringify({ steps: [{ capability: "browser", args: { action: "search", params: { query: "test" } } }] });
         }
     };
+    const fakeProviderManager = {
+        resolveForUser: async () => fakeProvider
+    };
     const planner = new TaskPlanner({ get: (name) => (name === "providerManager" ? fakeProviderManager : null) });
 
-    await planner.plan({}, { intent: "browser", parameters: {}, requiresTool: true });
+    await planner.plan({}, { intent: "browser", parameters: {}, requiresTool: true }, "user-1");
 
     assert.ok(capturedPrompt, "the LLM prompt should have been built");
 
@@ -54,15 +57,18 @@ test("taskPlanner's prompt only advertises capability ids that are ACTUALLY regi
 
 test("taskPlanner: does not advertise 'memory' or 'desktop' as plan-driven capabilities (neither has real, working plan-driven actions)", async () => {
     let capturedPrompt = null;
-    const fakeProviderManager = {
+    const fakeProvider = {
         generate: async (contents) => {
             capturedPrompt = contents[0].parts[0].text;
             return JSON.stringify({ steps: [] });
         }
     };
+    const fakeProviderManager = {
+        resolveForUser: async () => fakeProvider
+    };
     const planner = new TaskPlanner({ get: (name) => (name === "providerManager" ? fakeProviderManager : null) });
 
-    await planner.plan({}, { intent: "memory", parameters: {}, requiresTool: true });
+    await planner.plan({}, { intent: "memory", parameters: {}, requiresTool: true }, "user-1");
 
     assert.ok(capturedPrompt);
     assert.ok(!/^- "memory":/m.test(capturedPrompt), "memory has no real plan-driven actions and should not be advertised");

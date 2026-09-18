@@ -230,9 +230,8 @@ test("ClaudeCodingProvider: full agent loop via CodingAgentRuntime actually writ
 });
 
 test("OpenAIProvider (raw): converts plain tool defs to the real FunctionTool wire shape before calling the SDK", async () => {
-    process.env.OPENAI_API_KEY = "test-key";
     const OpenAIProvider = require("../providers/OpenAIProvider");
-    const provider = new OpenAIProvider();
+    const provider = new OpenAIProvider({ apiKey: "test-key" });
     let captured = null;
     provider.client = { responses: { create: async (req) => { captured = req; return { output: [], output_text: "ok" }; } } };
 
@@ -249,9 +248,8 @@ test("OpenAIProvider (raw): converts plain tool defs to the real FunctionTool wi
 });
 
 test("AnthropicProvider (raw): converts plain tool defs to the real Tool wire shape (input_schema, not parameters) before calling the SDK", async () => {
-    process.env.ANTHROPIC_API_KEY = "test-key";
     const AnthropicProvider = require("../providers/AnthropicProvider");
-    const provider = new AnthropicProvider();
+    const provider = new AnthropicProvider({ apiKey: "test-key" });
     let captured = null;
     provider.client = { messages: { create: async (req) => { captured = req; return { content: [{ type: "text", text: "ok" }] }; } } };
 
@@ -267,26 +265,28 @@ test("AnthropicProvider (raw): converts plain tool defs to the real Tool wire sh
     assert.ok(captured.max_tokens > 0);
 });
 
-test("ProviderManager: registers OpenAI/Claude only when their API keys are present, and never crashes app startup when they're absent", () => {
+test("GeminiProvider/OpenAIProvider/AnthropicProvider: constructor throws with no apiKey and NEVER falls back to process.env", () => {
+    delete process.env.GEMINI_API_KEY;
     delete process.env.OPENAI_API_KEY;
     delete process.env.ANTHROPIC_API_KEY;
-    if (!process.env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = "test-only-placeholder";
+    process.env.GEMINI_API_KEY = "should-never-be-read";
+    process.env.OPENAI_API_KEY = "should-never-be-read";
+    process.env.ANTHROPIC_API_KEY = "should-never-be-read";
 
-    delete require.cache[require.resolve("../providers/ProviderManager")];
-    const ProviderManager = require("../providers/ProviderManager");
-    const manager = new ProviderManager({}); // no real Kernel methods needed by GeminiProvider's constructor path here
+    const GeminiProvider = require("../providers/GeminiProvider");
+    const OpenAIProvider = require("../providers/OpenAIProvider");
+    const AnthropicProvider = require("../providers/AnthropicProvider");
 
-    assert.ok(manager.getRawProvider("gemini"));
-    assert.equal(manager.getRawProvider("openai"), null);
-    assert.equal(manager.getRawProvider("claude"), null);
+    // Env vars are set (to an obviously-fake value) but no apiKey option is
+    // passed - if any of these silently fell back to process.env, they
+    // would NOT throw. Each must throw regardless of what's in env.
+    assert.throws(() => new GeminiProvider({}), /apiKey/i);
+    assert.throws(() => new OpenAIProvider({}), /apiKey/i);
+    assert.throws(() => new AnthropicProvider({}), /apiKey/i);
 
-    process.env.OPENAI_API_KEY = "test-key";
-    process.env.ANTHROPIC_API_KEY = "test-key";
-    delete require.cache[require.resolve("../providers/ProviderManager")];
-    const ProviderManager2 = require("../providers/ProviderManager");
-    const manager2 = new ProviderManager2({});
-    assert.ok(manager2.getRawProvider("openai"));
-    assert.ok(manager2.getRawProvider("claude"));
+    delete process.env.GEMINI_API_KEY;
+    delete process.env.OPENAI_API_KEY;
+    delete process.env.ANTHROPIC_API_KEY;
 });
 
 test("CodingAgentRuntime: zero provider-specific branching - the exact same runtime code path drives OpenAI, Claude, and (from other test files) Gemini", () => {

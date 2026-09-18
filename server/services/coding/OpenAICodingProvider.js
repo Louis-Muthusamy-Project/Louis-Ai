@@ -23,7 +23,7 @@ class OpenAICodingProvider extends CodingModelProvider {
     }
 
     isConfigured() {
-        return !!(this.openAIProvider && process.env.OPENAI_API_KEY);
+        return !!(this.openAIProvider);
     }
 
     buildInitialHistory(taskText, systemInstruction) {

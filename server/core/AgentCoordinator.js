@@ -75,7 +75,7 @@ class AgentCoordinator extends BaseAgent {
         this.broadcast("ai.thinking.started", { socketId });
 
         // Let Planner agent process intent and plan
-        const planResult = await this.kernel.get("taskPlanner").plan(context, intentResult);
+        const planResult = await this.kernel.get("taskPlanner").plan(context, intentResult, socketId);
         
         this.broadcast("plan.created", { socketId, steps: planResult.steps });
 

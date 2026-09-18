@@ -238,7 +238,7 @@ class CodingAgentRuntime {
             return this._finish(session, STATES.CANCELLED, "Pending action denied by user.");
         }
 
-        const provider = session.provider || this._rebuildProvider(session.providerName);
+        const provider = session.provider || await this._rebuildProvider(userId, session.providerName);
         session.provider = provider;
         session.state = STATES.RUNNING;
 
@@ -261,11 +261,11 @@ class CodingAgentRuntime {
         return this._loop(session, provider);
     }
 
-    _rebuildProvider(providerName) {
+    async _rebuildProvider(userId, providerName) {
         if (!this.providerRegistry) {
             throw new Error("Cannot resume this session: no provider registry is configured on this runtime instance (likely a fresh process with no prior in-memory session).");
         }
-        return this.providerRegistry.getCodingProvider(providerName);
+        return this.providerRegistry.getCodingProvider(userId, providerName);
     }
 
     async _reconstructSession(userId, sessionId) {

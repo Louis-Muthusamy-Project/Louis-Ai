@@ -109,19 +109,20 @@ test("credentials are isolated per user - one user's key is invisible to another
     assert.equal((await service.resolveCredential("user-a", "gemini", "chat")).apiKey, "user-a-key");
 });
 
-test("migrateFromEnvIfNeeded imports an existing env key exactly once, and removal is never re-imported", async () => {
+test("resolveCredential NEVER falls back to a provider API key env var, even when one is set", async () => {
     const { service } = makeService();
     const userId = "user-8";
     const savedEnv = process.env.GEMINI_API_KEY;
     try {
-        process.env.GEMINI_API_KEY = "env-provided-gemini-key";
+        process.env.GEMINI_API_KEY = "env-provided-gemini-key-should-never-be-used";
 
-        await service.migrateFromEnvIfNeeded(userId, "gemini");
-        assert.equal((await service.resolveCredential(userId, "gemini", "chat")).apiKey, "env-provided-gemini-key");
-
-        // Simulate the user explicitly removing it - env must not re-import.
-        await service.removeApiKey(userId, "gemini");
-        await service.migrateFromEnvIfNeeded(userId, "gemini");
+        // No setApiKey call for this user at all - if resolveCredential
+        // (or anything it calls) silently imported/used the env var, this
+        // would resolve successfully instead of rejecting.
+        await assert.rejects(
+            () => service.resolveCredential(userId, "gemini", "chat"),
+            /not configured/
+        );
         assert.equal(service.getStatus(userId, "gemini").hasKey, false);
     } finally {
         if (savedEnv === undefined) delete process.env.GEMINI_API_KEY;

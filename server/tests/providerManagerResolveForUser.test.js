@@ -4,9 +4,6 @@ const path = require("path");
 const os = require("os");
 
 process.env.ENCRYPTION_MASTER_KEY = process.env.ENCRYPTION_MASTER_KEY || "test-only-master-key-do-not-use-in-prod";
-// GeminiProvider's boot-time (legacy) construction still requires this to
-// exist in the test process env - see ProviderManager's constructor.
-process.env.GEMINI_API_KEY = process.env.GEMINI_API_KEY || "boot-time-test-key";
 
 const SettingsFileStore = require("../infrastructure/SettingsFileStore");
 const { ProviderCredentialService } = require("../services/providerCredentialService");
@@ -50,14 +47,10 @@ test("resolveForUser throws a clear configuration error instead of silently usin
     const { kernel } = makeKernel();
     const manager = new ProviderManager(kernel);
 
-    // Uses "openai" (not "gemini") deliberately: this test file sets
-    // process.env.GEMINI_API_KEY for the legacy boot-time singleton test
-    // below, and providerCredentialService's env-migration feature would
-    // correctly (and separately - see providerCredentialService.test.js's
-    // migrateFromEnvIfNeeded test) auto-import that for gemini, which
-    // would make this specific assertion a false negative. No
-    // OPENAI_API_KEY is set in this test process, so there's nothing to
-    // migrate and the missing-config error path is exercised cleanly.
+    // Uses "openai" (not "gemini") deliberately, though it no longer
+    // matters functionally now that ProviderCredentialService has zero
+    // env-fallback/migration behavior for any provider - kept as "openai"
+    // for clarity since it's the provider under test either way.
     await assert.rejects(
         () => manager.resolveForUser("user-with-no-key", "openai", "coding"),
         /not configured/
@@ -82,11 +75,4 @@ test("resolveForUser requires a userId (no anonymous/global resolution)", async 
     const { kernel } = makeKernel();
     const manager = new ProviderManager(kernel);
     await assert.rejects(() => manager.resolveForUser(null, "gemini", "chat"), /authenticated userId/);
-});
-
-test("the legacy env-based singleton path (ProviderManager.provider) still works unchanged for un-migrated call sites", () => {
-    const { kernel } = makeKernel();
-    const manager = new ProviderManager(kernel);
-    assert.equal(manager.getProviderName(), "gemini");
-    assert.ok(manager.provider instanceof GeminiProvider);
 });

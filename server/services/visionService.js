@@ -1,14 +1,21 @@
-const { GoogleGenAI } = require('@google/genai');
 const VisionMemory = require('../models/VisionMemory');
+const Kernel = require('../core/Kernel');
 
 class VisionService {
     constructor() {
-        this.ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
         this.modelName = "gemini-2.5-flash"; // Using flash for speed in vision tasks
+    }
+
+    get providerManager() {
+        return Kernel.get('providerManager');
     }
 
     /**
      * Process an image (base64) using Gemini and store the result in memory.
+     * Resolves THIS user's own configured Gemini credential per-request (see
+     * ProviderManager.resolveForUser) - never a module-level client built
+     * from process.env.GEMINI_API_KEY, so vision genuinely honors per-user
+     * Settings keys and per-user isolation like every other AI call path.
      * @param {string} userId - Authenticated owner of this analysis (never trust a client-supplied id here).
      * @param {string} base64Image - The image data (e.g. data:image/jpeg;base64,...)
      * @param {string} source - 'camera', 'screen', etc.
@@ -18,6 +25,8 @@ class VisionService {
             throw new Error("processImage requires an authenticated userId.");
         }
         try {
+            const geminiProvider = await this.providerManager.resolveForUser(userId, "gemini", "vision");
+
             // Remove the data URL prefix if present
             const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, "");
 
@@ -27,8 +36,8 @@ class VisionService {
             3. List key objects or elements you see.
             Format your response as JSON with keys: description, ocrSummary, objects.`;
 
-            const response = await this.ai.models.generateContent({
-                model: this.modelName,
+            const response = await geminiProvider.client.models.generateContent({
+                model: geminiProvider.model,
                 contents: [
                     {
                         role: 'user',

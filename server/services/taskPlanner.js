@@ -11,9 +11,12 @@ class TaskPlanner {
      * Generates an execution plan based on detected intent.
      * @param {Object} context Context state
      * @param {Object} detectionResult { intent, confidence, parameters, riskLevel, requiresTool, requiresConfirmation }
+     * @param {string} userId Authenticated owner - resolves THIS user's own
+     *   configured Gemini credential (never the boot-time env-based
+     *   singleton).
      * @returns {Promise<Object>} Plan structure: { steps: [{ capability, args }] }
      */
-    async plan(context, detectionResult) {
+    async plan(context, detectionResult, userId) {
         const { intent, parameters, requiresTool } = detectionResult;
         
         // If it doesn't require a tool, no strict plan is needed, it's just a conversational response.
@@ -67,7 +70,8 @@ Response MUST be JSON only. No explanation. No markdown codeblocks.`;
                 }
             ];
 
-            const reply = await this.providerManager.generate(contents);
+            const provider = await this.providerManager.resolveForUser(userId, "gemini", "chat");
+            const reply = await provider.generate(contents);
             
             let jsonText = reply.trim();
             if (jsonText.startsWith("```json")) {

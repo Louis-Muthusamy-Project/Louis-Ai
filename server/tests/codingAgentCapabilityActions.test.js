@@ -5,9 +5,12 @@ const os = require("os");
 const path = require("path");
 
 const Kernel = require("../core/Kernel");
+process.env.JWT_SECRET = process.env.JWT_SECRET || "test-only-secret-do-not-use-in-prod";
 if (!process.env.GEMINI_API_KEY) process.env.GEMINI_API_KEY = "test-only-placeholder-not-a-real-key";
 if (!Kernel.has("eventBus")) Kernel.register("eventBus", require("../core/EventBus"));
 if (!Kernel.has("providerManager")) Kernel.register("providerManager", require("../providers/ProviderManager"));
+if (!Kernel.has("settingsFileStore")) Kernel.register("settingsFileStore", new (require("../infrastructure/SettingsFileStore"))());
+if (!Kernel.has("providerCredentialService")) Kernel.register("providerCredentialService", require("../services/providerCredentialService").ProviderCredentialService);
 
 const { CodingWorkspaceService } = require("../services/codingWorkspaceService");
 const capability = require("../capabilities/CodingWorkspaceCapability");
@@ -29,7 +32,17 @@ function makeWorkspace(userId = "capagentuser") {
     return root;
 }
 
+// Provider availability is now per-user (see CodingProviderRegistry /
+// providerCredentialService) rather than boot-time-env-based, so tests
+// that expect Gemini to show as "configured" must actually give that
+// user a real (fake-valued, never a live key) encrypted credential first -
+// exactly what a user does from Settings -> AI Providers.
+async function giveUserGeminiCredential(userId) {
+    await Kernel.get("providerCredentialService").setApiKey(userId, "gemini", "test-only-placeholder-not-a-real-key");
+}
+
 test("CodingWorkspaceCapability: agent.providers reports Gemini configured and OpenAI/Claude visible-but-disabled", async () => {
+    await giveUserGeminiCredential("capagentuser");
     await capability.initialize(Kernel);
     const result = await capability.execute({ action: "agent.providers", params: {}, __ownerId: "capagentuser" });
     assert.equal(result.success, true);
@@ -44,6 +57,7 @@ test("CodingWorkspaceCapability: agent.providers reports Gemini configured and O
 });
 
 test("CodingWorkspaceCapability: agent.run rejects an unavailable provider (claude) without ever running anything", async () => {
+
     makeWorkspace();
     await capability.initialize(Kernel);
     const result = await capability.execute({
@@ -77,7 +91,8 @@ test("CodingWorkspaceCapability: agent.run drives a real CodingAgentRuntime run 
     await capability.initialize(Kernel);
 
     const original = capability.providerRegistry.getCodingProvider;
-    capability.providerRegistry.getCodingProvider = (name) => {
+    capability.providerRegistry.getCodingProvider = (userId, name) => {
+        assert.equal(userId, "capagentuser");
         assert.equal(name, "gemini");
         return new ScriptedProvider([
             { calls: [{ name: "file_create", args: { path: "via-capability.txt", content: "ok" } }] },

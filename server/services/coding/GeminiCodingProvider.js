@@ -26,12 +26,12 @@ class GeminiCodingProvider extends CodingModelProvider {
     }
 
     isConfigured() {
-        // GeminiProvider's constructor already throws if GEMINI_API_KEY is
-        // missing, so if we have an instance at all, it's configured. This
-        // stays a real check (not just "truthy instance") so a future
-        // provider that DOESN'T throw at construction time still reports
-        // correctly.
-        return !!(this.geminiProvider && process.env.GEMINI_API_KEY);
+        // Provider instances are now only ever constructed via
+        // CodingProviderRegistry.getCodingProvider() AFTER a successful
+        // per-user credential resolve (ProviderManager.resolveForUser) -
+        // so instance-truthy is a real, accurate check here, not a stand-in
+        // for a boot-time env var.
+        return !!(this.geminiProvider);
     }
 
     buildInitialHistory(taskText, systemInstruction) {
