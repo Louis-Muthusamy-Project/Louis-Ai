@@ -1,0 +1,47 @@
+.panel {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: #17171c;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.tabs {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.tabs :global(.ant-tabs-nav) {
+  margin-bottom: 0;
+  padding: 0 8px;
+}
+
+.tabs :global(.ant-tabs-content) {
+  height: 100%;
+}
+
+.tabs :global(.ant-tabs-tabpane) {
+  height: 100%;
+  overflow: auto;
+}
+
+.closeButton {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+.closeButton:hover {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.notAvailable {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

@@ -120,6 +120,17 @@ test("CodingWorkspaceService: search finds a filename match and a content match"
     assert.ok(byContent.some((r) => r.path === "src/Other.jsx" && r.matchType === "content"));
 });
 
+test("CodingWorkspaceService: search returns the matched line's text and number for content matches (for the Coding UI's Search panel)", () => {
+    makeWorkspace();
+    CodingWorkspaceService.writeFile("user1", "src/utils.js", "function a() {}\nfunction findMeHere() { return 42; }\nfunction c() {}");
+
+    const results = CodingWorkspaceService.search("user1", "findMeHere");
+    const match = results.find((r) => r.path === "src/utils.js" && r.matchType === "content");
+    assert.ok(match);
+    assert.equal(match.line, 2);
+    assert.equal(match.lineText, "function findMeHere() { return 42; }");
+});
+
 test("CodingWorkspaceService: search never returns secret files even as content matches", () => {
     const root = makeWorkspace();
     fs.writeFileSync(path.join(root, ".env"), "SUPER_SECRET_TOKEN=xyz");

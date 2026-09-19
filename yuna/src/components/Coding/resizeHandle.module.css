@@ -13,3 +13,19 @@
 .handle.active {
     background: rgba(168, 85, 247, 0.35);
 }
+
+.handleRow {
+    flex-shrink: 0;
+    height: 6px;
+    margin: -3px 0;
+    position: relative;
+    z-index: 5;
+    cursor: row-resize;
+    background: transparent;
+    transition: background 0.12s ease;
+}
+
+.handleRow:hover,
+.handleRow.active {
+    background: rgba(168, 85, 247, 0.35);
+}

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import Editor from "@monaco-editor/react";
 import { Tabs, Empty, Spin, Button, App as AntApp } from "antd";
 import { SaveOutlined, ReloadOutlined, WarningOutlined } from "@ant-design/icons";
@@ -35,9 +35,28 @@ export default function CodeEditor() {
 
     const openTabs = useCodingStore(state => state.openTabs);
     const activeTabPath = useCodingStore(state => state.activeTabPath);
+    const pendingReveal = useCodingStore(state => state.pendingReveal);
     const [saving, setSaving] = useState(false);
+    const editorRef = useRef(null);
 
     const activeTab = openTabs.find(t => t.path === activeTabPath);
+
+    // Search-result navigation (see SearchPanel/openFile.js's revealLine):
+    // once the target file's tab has actually finished loading, scroll
+    // Monaco to and select the matching line, then clear the request so
+    // it doesn't re-fire on unrelated re-renders.
+    useEffect(() => {
+        if (!pendingReveal || !editorRef.current) return;
+        if (pendingReveal.path !== activeTabPath) return;
+        if (!activeTab || activeTab.loading || activeTab.error) return;
+
+        const editor = editorRef.current;
+        const line = pendingReveal.line;
+        editor.revealLineInCenter(line);
+        editor.setPosition({ lineNumber: line, column: 1 });
+        editor.focus();
+        useCodingStore.getState().clearPendingReveal();
+    }, [pendingReveal, activeTabPath, activeTab]);
 
     async function handleSave() {
         if (!activeTab) return;
@@ -156,6 +175,7 @@ export default function CodeEditor() {
                         theme="vs-dark"
                         language={languageFor(activeTab.path)}
                         value={activeTab.content}
+                        onMount={(editor) => { editorRef.current = editor; }}
                         onChange={(value) => useCodingStore.getState().editTabContent(activeTab.path, value ?? "")}
                         options={{
                             minimap: { enabled: false },

@@ -103,12 +103,13 @@ export default function WorkspaceBar({ task, onOpenHistory }) {
             </div>
 
             <div className={styles.providerGroup}>
+                <span className={styles.providerLabel}>AI Model</span>
                 <Select
                     size="small"
                     className={styles.providerSelect}
                     loading={providersLoading}
                     value={selectedProvider}
-                    placeholder="Select provider"
+                    placeholder="Select a model"
                     onChange={setSelectedProvider}
                     disabled={running}
                     options={providers.map(p => ({

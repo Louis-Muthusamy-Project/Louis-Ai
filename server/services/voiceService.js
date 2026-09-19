@@ -1,18 +1,22 @@
 /**
  * ==========================================
- * Upgraded Voice Service
+ * Voice Service
  * ==========================================
  * Features:
  *   - Speech State Machine (idle, generating, speaking, interrupted)
  *   - Chronological Speech Queue with Interrupt priority
  *   - Dynamic voice provider routing
- *   - Accurate Lip Sync (Viseme) preparation and timings
- *   - Noise Reduction & Voice Identification utilities
- *   - Wake Word matching
+ *   - TTS text sanitization (emoji stripping) before any provider call
+ *
+ * Real mouth movement is driven entirely by the frontend's own Web Audio
+ * AnalyserNode reading the actual played-back audio (see
+ * yuna/src/live2d/LipSyncEngine.js) - this service does not compute or
+ * emit any backend viseme/lip-sync timing data.
  */
 const EventEmitter = require("events");
 const EdgeTTSProvider = require("../providers/tts/EdgeTTSProvider");
 const TTSService = require("./ttsService");
+const { sanitizeTtsText } = require("../utils/ttsTextSanitizer");
 
 // Bind default provider
 TTSService.setProvider(new EdgeTTSProvider());
@@ -127,9 +131,28 @@ class VoiceService extends EventEmitter {
 
         this.emit("voice:start", { text, ownerId });
 
+        // TTS text sanitizer: strips emojis/emoji-related symbols before
+        // ANY text reaches a TTS provider (see ttsTextSanitizer.js). This
+        // ONLY affects the throwaway copy synthesized below - `text`
+        // itself (and anything already stored/displayed in chat history)
+        // is never touched.
+        const speakableText = sanitizeTtsText(text);
+
+        if (!speakableText) {
+            // Nothing speakable remains (e.g. an emoji-only segment) - do
+            // NOT call the TTS provider at all. Report a clean no-speech
+            // result and return straight to idle.
+            this.emit("voice:no-speech", { text, ownerId });
+            if (this.currentState === SPEECH_STATES.GENERATING) {
+                this._transitionTo(SPEECH_STATES.IDLE);
+            }
+            this.currentText = "";
+            return;
+        }
+
         try {
             // Synthesize audio - fully in memory, no temp files (see EdgeTTSProvider)
-            const audioData = await TTSService.synthesize({ text });
+            const audioData = await TTSService.synthesize({ text: speakableText });
             
             if (this.currentState === SPEECH_STATES.INTERRUPTED) return;
             this._transitionTo(SPEECH_STATES.SPEAKING);
@@ -245,45 +268,6 @@ class VoiceService extends EventEmitter {
         } else if (hadQueued) {
             this.emit("voice:stop", { ownerId });
         }
-    }
-
-    // ── Cognitive Audio Analysis Utilities ──────────────────────────────────
-
-    /**
-     * Noise Reduction Filter
-     * Real implementation would require a native C++ module or a robust web audio API in node.
-     * Removed fake pass-through.
-     */
-    applyNoiseReduction(buffer, threshold = 0.05) {
-        if (!buffer) return null;
-        // If no real implementation exists, we don't pretend to process it.
-        return buffer;
-    }
-
-    /**
-     * Voice Identification
-     * Real implementation would require a speaker verification model.
-     * Removed fake mock implementation.
-     */
-    identifyVoice(audioFingerprint) {
-        // We do not pretend to identify voices if we lack the capability.
-        return { identified: false, user: "Guest", confidence: 0 };
-    }
-
-    /**
-     * Wake Word Detection
-     * Checks if input speech contains Yuna's wake keywords.
-     */
-    detectWakeWord(text = "") {
-        const lower = text.toLowerCase();
-        const keywords = ["hey yuna", "wake up yuna", "yuna"];
-        for (const kw of keywords) {
-            if (lower.includes(kw)) {
-                this.emit("voice:wake");
-                return true;
-            }
-        }
-        return false;
     }
 
     delay(ms) {

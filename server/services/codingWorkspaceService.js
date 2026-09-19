@@ -345,8 +345,15 @@ class CodingWorkspaceService {
                         const content = fs.readFileSync(entryAbs, "utf8");
                         const lineIndex = content.toLowerCase().indexOf(needle);
                         if (lineIndex !== -1) {
-                            const lineNumber = content.slice(0, lineIndex).split("\n").length;
-                            results.push({ path: entryRel, matchType: "content", line: lineNumber });
+                            const lines = content.slice(0, lineIndex).split("\n");
+                            const lineNumber = lines.length;
+                            const lineStart = lineIndex - lines[lines.length - 1].length;
+                            const lineEndIdx = content.indexOf("\n", lineIndex);
+                            const rawLine = content.slice(lineStart, lineEndIdx === -1 ? content.length : lineEndIdx);
+                            // Capped so one huge minified line can't balloon the
+                            // response - callers just need enough to recognize the match.
+                            const lineText = rawLine.length > 200 ? `${rawLine.slice(0, 200)}…` : rawLine;
+                            results.push({ path: entryRel, matchType: "content", line: lineNumber, lineText: lineText.trim() });
                         }
                     } catch {
                         // Binary/unreadable file - skip silently, not a search failure.

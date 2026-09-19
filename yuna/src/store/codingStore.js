@@ -11,8 +11,13 @@ const useCodingStore = create((set) => ({
     workspaceLoading: false,
     workspaceError: null,
 
-    setWorkspace(workspace) {
-        set({ workspace, workspaceError: null });
+    // Merges into the existing workspace object rather than replacing it -
+    // callers pass only the fields they actually have (e.g. WorkspaceBar's
+    // handleSetWorkspace only has {configured, root}, not `entries`), and
+    // a partial update must never silently wipe out other already-known
+    // workspace metadata.
+    setWorkspace(patch) {
+        set(state => ({ workspace: { ...state.workspace, ...patch }, workspaceError: null }));
     },
 
     setWorkspaceLoading(value) {
@@ -128,6 +133,22 @@ const useCodingStore = create((set) => ({
                 ? { ...t, externalConflict: true }
                 : t)
         }));
+    },
+
+    // Set by SearchPanel when a result is opened - CodeEditor watches this
+    // and, once the target file's tab has actually finished loading,
+    // scrolls Monaco to the matching line and clears it. Carries the path
+    // alongside the line so a reveal meant for one file is never applied
+    // to whatever tab happens to be active if the user switches tabs
+    // before the file finishes loading.
+    pendingReveal: null, // {path, line} | null
+
+    setPendingReveal(path, line) {
+        set({ pendingReveal: { path, line } });
+    },
+
+    clearPendingReveal() {
+        set({ pendingReveal: null });
     },
 
     // ---- Providers -------------------------------------------------------
@@ -265,7 +286,7 @@ const useCodingStore = create((set) => ({
         set({
             workspace: { configured: false, root: null },
             tree: {}, expandedDirs: {},
-            openTabs: [], activeTabPath: null,
+            openTabs: [], activeTabPath: null, pendingReveal: null,
             session: null, activity: [], pendingApproval: null,
             terminalHistory: [],
             gitStatus: null, gitDiff: null, gitLog: null

@@ -7,6 +7,7 @@ import {
 
 import CodingSocketService from "../../services/codingSocketService";
 import useCodingStore from "../../store/codingStore";
+import { openCodingFile } from "./openFile";
 
 import styles from "./fileExplorer.module.css";
 
@@ -63,14 +64,7 @@ export default function FileExplorer() {
     }
 
     async function handleOpenFile(path) {
-        useCodingStore.getState().openTabLoading(path);
-        const result = await CodingSocketService.readFile(path);
-        if (!result.success) {
-            useCodingStore.getState().setTabError(path, result.message);
-            message.error(result.message || "Could not open file.");
-            return;
-        }
-        useCodingStore.getState().setTabContent(path, result.content, result.hash);
+        await openCodingFile(path, { error: message.error });
     }
 
     function joinPath(dir, name) {
