@@ -7,9 +7,21 @@
   overflow: hidden;
 }
 
-.taskArea {
-  padding: 10px;
+.statusBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
   border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.modelBadge {
+  font-size: 11px;
+  color: rgba(255,255,255,0.55);
+  font-family: "SFMono-Regular", Consolas, monospace;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .stats {
@@ -66,3 +78,30 @@
 
 .finalResult { color: rgba(255,255,255,0.85); }
 .finalError { color: #dc2626; }
+
+/* ---- Composer (task input + Attach/Mic/Run Agent) ---- */
+
+.composer {
+  flex-shrink: 0;
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: 8px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.interim {
+  font-size: 12px;
+  color: rgba(255,255,255,0.5);
+  font-style: italic;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.composerSpacer {
+  flex: 1;
+}

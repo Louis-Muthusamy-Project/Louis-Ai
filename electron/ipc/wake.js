@@ -107,3 +107,19 @@ ipcMain.handle("wake:microphone:permission", async () => {
     }
     return { platform: process.platform, status: systemPreferences.getMediaAccessStatus("microphone") };
 });
+
+// Sent by the MAIN window (any manual mic use - Chat/Character voice
+// input, the Coding Agent panel's mic) whenever it starts/stops its own
+// SpeechRecognition session, so the hidden wake-listener window can
+// pause its continuous session for that duration instead of fighting it
+// for the same microphone/speech-recognition resource (see
+// wakeWindowManager.sendToListener's own comment for why that
+// contention was causing the manual mic to immediately self-cancel).
+// Any renderer may call this (it's not a privileged/status-reporting
+// channel like wake:listener:status) - worst case a bogus call just
+// pauses/resumes the wake listener needlessly, it can't be used to read
+// or exfiltrate anything.
+ipcMain.handle("wake:mic:busy", (_event, payload = {}) => {
+    wakeWindowManager.sendToListener("wake:mic:busy:changed", { busy: !!payload.busy });
+    return true;
+});

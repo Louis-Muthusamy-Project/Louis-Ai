@@ -34,6 +34,18 @@ class AnthropicProvider extends BaseAIProvider {
         this.model = options.model || anthropicConfig.model;
     }
 
+    /**
+     * Real, live list of this key's actually-available Claude models -
+     * via the SDK's own documented models.list() (verified against the
+     * SDK's shipped type definitions, not a live call - no network route
+     * to Anthropic's endpoints in this sandbox).
+     */
+    async listModels() {
+        const list = await this.client.models.list();
+        return (list.data || [])
+            .map(m => ({ id: m.id, label: m.display_name || m.id }));
+    }
+
     getName() {
         return "claude";
     }

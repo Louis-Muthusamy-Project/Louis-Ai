@@ -1,5 +1,7 @@
 import { useRef, useState, useCallback, useEffect } from "react";
 
+import ElectronService from "../services/electronService";
+
 // The 3 UI languages this app supports, mapped to BCP-47 locale codes the
 // Web Speech API understands. Deliberately no other options are exposed -
 // see VoiceControls.jsx, which is the only place this hook's `start(lang)`
@@ -42,10 +44,11 @@ export default function useSpeechRecognition() {
             // Never leave a live microphone stream open past unmount -
             // e.g. navigating away from the Character tab mid-recognition.
             recognitionRef.current?.stop();
+            ElectronService.setWakeMicBusy(false);
         };
     }, []);
 
-    const start = useCallback((lang, onFinalTranscript) => {
+    const start = useCallback(async (lang, onFinalTranscript) => {
         if (!supported) {
             setError("Speech recognition isn't available in this browser.");
             return;
@@ -53,6 +56,20 @@ export default function useSpeechRecognition() {
         if (recognitionRef.current) {
             recognitionRef.current.stop();
         }
+
+        // Pause the wake listener's own continuous recognition FIRST, and
+        // actually wait for it - Chromium only reliably supports one
+        // active SpeechRecognition session at a time across this app's
+        // renderers, so starting ours while the wake listener still held
+        // the mic is exactly what was making this immediately abort right
+        // after turning "on". setWakeMicBusy's IPC round-trip only
+        // guarantees the pause *request* reached the other window, not
+        // that it has finished releasing the microphone yet, so a short
+        // real delay follows it - the most reliable option available
+        // without a slower cross-window ack handshake for something this
+        // latency-sensitive.
+        await ElectronService.setWakeMicBusy(true);
+        await new Promise((resolve) => setTimeout(resolve, 200));
 
         const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognitionCtor();
@@ -94,6 +111,12 @@ export default function useSpeechRecognition() {
         recognition.onend = () => {
             setListening(false);
             setInterimTranscript("");
+            // Tell the wake listener it can resume - see
+            // wakeWindowManager.sendToListener's comment for why this
+            // pause/resume handshake exists (two simultaneous
+            // SpeechRecognition sessions fighting over one microphone was
+            // causing this exact toggle to immediately self-cancel).
+            ElectronService.setWakeMicBusy(false);
         };
 
         recognitionRef.current = recognition;
@@ -104,6 +127,7 @@ export default function useSpeechRecognition() {
     const stop = useCallback(() => {
         recognitionRef.current?.stop();
         setListening(false);
+        ElectronService.setWakeMicBusy(false);
     }, []);
 
     return { supported, listening, interimTranscript, error, start, stop };

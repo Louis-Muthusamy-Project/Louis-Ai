@@ -29,6 +29,7 @@ function makeWorkspace(userId) {
 class FakeProvider extends CodingModelProvider {
     constructor(script, name = "fake") { super(); this.script = script; this.i = 0; this.name = name; }
     getName() { return this.name; }
+    getModel() { return `${this.name}-test-model`; }
     isConfigured() { return true; }
     buildInitialHistory(task) { return [{ turn: "initial", task }]; }
     async sendTurn(history) {
@@ -205,4 +206,128 @@ test("CodingAgentRuntime.resume: genuinely resumes after the in-memory session i
     assert.equal(resumed.state, STATES.COMPLETED);
     assert.equal(resumed.text, "resumed after restart");
     assert.equal(fs.existsSync(path.join(root, "important.txt")), false);
+});
+
+// ---- Model persistence/resume (see CodingAgentSession.model /
+// _rebuildProvider) - a resumed session must use the EXACT model it
+// originally started with, never whatever the user has since selected
+// in the UI, and never silently fall back to a provider's default model
+// when one was actually chosen. ----
+
+test("CodingAgentRuntime.run: the session stores the real resolved model from provider.getModel(), not a UI guess", async () => {
+    makeWorkspace("modeluser1");
+    const { sessionService } = makeRuntimeContext();
+    CodingAgentRuntime.initialize(new EventEmitter(), { sessionService });
+
+    const provider = new FakeProvider([{ text: "done" }], "gemini");
+    const result = await CodingAgentRuntime.run("modeluser1", "just answer", provider);
+
+    assert.equal(result.model, "gemini-test-model"); // FakeProvider.getModel()'s own value
+});
+
+test("toSessionRecord: the persisted record contains the session's model", async () => {
+    makeWorkspace("modeluser2");
+    const { sessionService } = makeRuntimeContext();
+    CodingAgentRuntime.initialize(new EventEmitter(), { sessionService });
+
+    const provider = new FakeProvider([{ text: "done" }], "gemini");
+    const result = await CodingAgentRuntime.run("modeluser2", "just answer", provider);
+
+    const record = await sessionService.getOwned("modeluser2", result.sessionId);
+    assert.equal(record.model, "gemini-test-model");
+});
+
+test("CodingAgentRuntime.resume (reconstructed from a persisted record): _rebuildProvider receives the PERSISTED model, never a provider default, even when the 'currently selected' model would differ", async () => {
+    const root = makeWorkspace("modeluser3");
+    fs.writeFileSync(path.join(root, "important.txt"), "keep me");
+    const { sessionService } = makeRuntimeContext();
+
+    let capturedArgs = null;
+    // Deliberately returns a DIFFERENT provider/model than what was
+    // originally selected, to prove _rebuildProvider is what's actually
+    // driving this - not some ambient "current UI selection" the fake
+    // could accidentally satisfy by coincidence.
+    const providerRegistry = {
+        getCodingProvider: (userId, name, model) => {
+            capturedArgs = { userId, name, model };
+            return new FakeProvider([{ text: "resumed with persisted model" }], name);
+        }
+    };
+    CodingAgentRuntime.initialize(new EventEmitter(), { sessionService, providerRegistry });
+
+    const provider = new FakeProvider([
+        { calls: [{ name: "file_delete", args: { path: "important.txt", confirmed: false } }] }
+    ], "gemini");
+    const paused = await CodingAgentRuntime.run("modeluser3", "delete the file", provider);
+    assert.equal(paused.model, "gemini-test-model");
+
+    // Simulate a server restart / a different-process resume, so
+    // _rebuildProvider is actually exercised rather than reusing the
+    // still-in-memory session.provider from run() above.
+    CodingAgentRuntime._sessions.delete(paused.sessionId);
+
+    const resumed = await CodingAgentRuntime.resume("modeluser3", paused.sessionId, {
+        approved: true,
+        approvalId: paused.pendingApproval.approvalId
+    });
+
+    assert.equal(resumed.state, STATES.COMPLETED);
+    assert.ok(capturedArgs, "expected the provider registry to have been called to rebuild the provider");
+    assert.equal(capturedArgs.userId, "modeluser3");
+    assert.equal(capturedArgs.name, "gemini");
+    assert.equal(capturedArgs.model, "gemini-test-model", "resume must pass the PERSISTED session model, not a default/guess");
+});
+
+test("CodingAgentRuntime.resume: a legacy persisted record with no model field still resumes, falling back to the provider's own default (never invents a model)", async () => {
+    const root = makeWorkspace("modeluser4");
+    fs.writeFileSync(path.join(root, "important.txt"), "keep me");
+    const { sessionService } = makeRuntimeContext();
+
+    let capturedModel = "not-called";
+    const providerRegistry = {
+        getCodingProvider: (userId, name, model) => {
+            capturedModel = model;
+            return new FakeProvider([{ text: "resumed legacy session" }], name);
+        }
+    };
+    CodingAgentRuntime.initialize(new EventEmitter(), { sessionService, providerRegistry });
+
+    // A record shaped exactly like one saved before the `model` field
+    // existed - no `model` key at all, not even null.
+    const legacyApprovalId = "legacy-approval-1";
+    await sessionService.save({
+        sessionId: "legacy-session-1",
+        userId: "modeluser4",
+        providerName: "gemini",
+        // no `model` field - this is the point of the test
+        task: "delete the file",
+        state: STATES.WAITING_FOR_APPROVAL,
+        history: [{ turn: "initial", task: "delete the file" }],
+        finalText: "",
+        message: "",
+        iterations: 1,
+        toolCalls: 0,
+        changedFiles: [],
+        activity: [],
+        pendingApproval: {
+            approvalId: legacyApprovalId,
+            call: { id: "c1", name: "file_delete", args: { path: "important.txt" } },
+            reason: "DESTRUCTIVE_UNCONFIRMED",
+            message: "Confirm deleting important.txt"
+        },
+        startedAt: Date.now(),
+        updatedAt: Date.now()
+    });
+
+    const resumed = await CodingAgentRuntime.resume("modeluser4", "legacy-session-1", {
+        approved: true,
+        approvalId: legacyApprovalId
+    });
+
+    assert.equal(resumed.state, STATES.COMPLETED);
+    // No override requested - CodingProviderRegistry.getCodingProvider
+    // treats a falsy model as "use this provider's stored default",
+    // exactly the pre-existing behavior for every session before this
+    // field existed.
+    assert.equal(capturedModel, null);
 });

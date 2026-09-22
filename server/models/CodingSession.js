@@ -20,6 +20,15 @@ const codingSessionSchema = new mongoose.Schema({
     sessionId: { type: String, required: true, unique: true, index: true },
     userId: { type: String, required: true, index: true },
     providerName: { type: String, required: true },
+    // The exact model this session actually started with (see
+    // CodingAgentSession.model / CodingAgentRuntime.run()'s
+    // provider.getModel()) - immutable for the session's lifetime, and
+    // what _rebuildProvider() uses on resume so a later change to the
+    // user's selected model never silently retargets an in-progress
+    // session. Absent/null on older records saved before this field
+    // existed - resume() falls back to that provider's stored default
+    // model for those, exactly as it did before this field existed.
+    model: { type: String, default: null },
     task: { type: String, required: true },
     state: { type: String, required: true },
     history: { type: mongoose.Schema.Types.Mixed, default: [] },

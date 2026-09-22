@@ -90,6 +90,23 @@ class ElectronService {
         this.on("wake:settings:changed", callback);
     }
 
+    /**
+     * Tells the hidden wake-listener window to pause (busy=true) or
+     * resume (busy=false) its own continuous SpeechRecognition session -
+     * call this around any manual mic use in the main window (Chat/
+     * Character voice input, the Coding Agent panel's mic). Safe/no-op
+     * outside Electron (this.available guards it, same as every other
+     * method here) - a browser-only dev session simply has no wake
+     * listener to pause in the first place.
+     */
+    async setWakeMicBusy(busy) {
+        return this.invoke("wake:mic:busy", { busy });
+    }
+
+    onWakeMicBusyChanged(callback) {
+        this.on("wake:mic:busy:changed", callback);
+    }
+
 }
 
 export default new ElectronService();

@@ -25,6 +25,10 @@ class GeminiCodingProvider extends CodingModelProvider {
         return "gemini";
     }
 
+    getModel() {
+        return this.geminiProvider.model;
+    }
+
     isConfigured() {
         // Provider instances are now only ever constructed via
         // CodingProviderRegistry.getCodingProvider() AFTER a successful

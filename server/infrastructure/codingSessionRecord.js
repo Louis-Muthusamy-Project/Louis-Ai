@@ -34,6 +34,7 @@ function toSessionRecord(session, history) {
         sessionId: session.sessionId,
         userId: session.userId,
         providerName: session.providerName,
+        model: session.model || null,
         task: session.task,
         state: session.state,
         history: serializedHistory,

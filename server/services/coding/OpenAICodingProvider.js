@@ -22,6 +22,10 @@ class OpenAICodingProvider extends CodingModelProvider {
         return "openai";
     }
 
+    getModel() {
+        return this.openAIProvider.model;
+    }
+
     isConfigured() {
         return !!(this.openAIProvider);
     }

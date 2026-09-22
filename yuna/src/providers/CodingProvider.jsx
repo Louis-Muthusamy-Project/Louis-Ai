@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 
 import SocketService from "../services/socketService";
+import CodingSocketService from "../services/codingSocketService";
 import useCodingStore from "../store/codingStore";
 import {
     CODING_SESSION_START,
@@ -47,7 +48,7 @@ export default function CodingProvider({ children }) {
         };
 
         const onSessionStart = (data) => {
-            store().startSession({ sessionId: data.sessionId, task: data.task, provider: data.provider });
+            store().startSession({ sessionId: data.sessionId, task: data.task, provider: data.provider, model: data.model });
         };
 
         const onThinking = (data) => {
@@ -69,8 +70,25 @@ export default function CodingProvider({ children }) {
         const onFileChanged = (data) => {
             if (!isCurrent(data.sessionId)) return;
             store().addChangedFile(data.path);
-            store().markFileChangedExternally(data.path);
             store().appendActivity({ event: "file_changed", path: data.path, operation: data.operation });
+
+            // If this file is open here and the user hasn't typed anything
+            // unsaved into it, silently pull the agent's real new content
+            // in rather than leaving the tab stale or interrupting with a
+            // reload prompt - see CodeEditor.jsx's own doc comment for why
+            // there's no such prompt anywhere in this app. A DIRTY tab is
+            // left alone: the user's own edits are what auto-save exists
+            // to protect, and the next save already resolves this the same
+            // way (re-save over the external change - see CodeEditor's
+            // saveFile).
+            const openTab = store().openTabs.find(t => t.path === data.path);
+            if (openTab && !openTab.dirty && data.operation !== "delete") {
+                CodingSocketService.readFile(data.path).then((result) => {
+                    if (result.success) {
+                        store().setTabContent(data.path, result.content, result.hash);
+                    }
+                });
+            }
         };
 
         const onTerminalStart = (data) => {

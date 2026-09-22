@@ -60,6 +60,29 @@ class ProviderManager {
         }
         throw new Error(`Unknown AI provider: "${providerName}".`);
     }
+
+    /**
+     * Resolves a provider instance for ONE user's own key with no
+     * pre-chosen model at all (see providerCredentialService's
+     * resolveApiKeyOnly) - used only to call that instance's own
+     * listModels(), which needs nothing but the key itself.
+     *
+     * @param {string} userId
+     * @param {"gemini"|"openai"|"claude"} providerName
+     */
+    async resolveForListingModels(userId, providerName) {
+        if (!userId) {
+            throw new Error("resolveForListingModels requires an authenticated userId.");
+        }
+
+        const providerCredentialService = this.kernel.get("providerCredentialService");
+        const { apiKey } = await providerCredentialService.resolveApiKeyOnly(userId, providerName);
+
+        if (providerName === "gemini") return new GeminiProvider({ apiKey });
+        if (providerName === "openai") return new OpenAIProvider({ apiKey });
+        if (providerName === "claude") return new AnthropicProvider({ apiKey });
+        throw new Error(`Unknown AI provider: "${providerName}".`);
+    }
 }
 
 module.exports = ProviderManager;

@@ -4,6 +4,22 @@
   height: 100%;
   background: #0d0d10;
   border-top: 1px solid rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .output {
@@ -52,4 +68,97 @@
   gap: 8px;
   padding: 8px 10px;
   border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+/* ---- Terminal instance list (right side, matches the reference
+   Antigravity/VS Code terminal picker) ---- */
+
+.instanceList {
+  width: 160px;
+  flex-shrink: 0;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.instanceListHeader {
+  display: flex;
+  justify-content: flex-end;
+  padding: 4px 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.addButton {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.55);
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+}
+
+.addButton:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.instance {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  cursor: pointer;
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.65);
+  position: relative;
+}
+
+.instance:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.instanceActive {
+  background: rgba(255, 255, 255, 0.09);
+  color: #fff;
+}
+
+.instanceIcon {
+  flex-shrink: 0;
+  font-size: 13px;
+}
+
+.instanceLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.instanceRunningDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  flex-shrink: 0;
+}
+
+.instanceClose {
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.4);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  flex-shrink: 0;
+  display: none;
+}
+
+.instance:hover .instanceClose {
+  display: inline-flex;
+}
+
+.instanceClose:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
 }

@@ -12,15 +12,6 @@ const PROVIDER_LABELS = {
     claude: "Claude"
 };
 
-const CAPABILITY_LABELS = {
-    chat: "Chat Model",
-    prompt: "Prompt Model",
-    image: "Image Model",
-    embedding: "Embedding Model",
-    coding: "Coding Model",
-    vision: "Vision Model"
-};
-
 /**
  * ==========================================
  * AiProvidersPanel
@@ -29,10 +20,16 @@ const CAPABILITY_LABELS = {
  * Claude API key is entered anywhere in the app - there is no .env option.
  * Talks to /api/settings/providers (see providerSettingsService.js /
  * server/routes/providerSettingsRoutes.js). Every response from that API
- * only ever contains hasKey/maskedKey/enabled/models - this component
- * never receives, stores, or displays a decrypted key. The key input is
- * cleared from local state immediately after a successful save, so
- * nothing plaintext lingers in memory once the server has it.
+ * only ever contains hasKey/maskedKey/enabled - this component never
+ * receives, stores, or displays a decrypted key. The key input is cleared
+ * from local state immediately after a successful save, so nothing
+ * plaintext lingers in memory once the server has it.
+ *
+ * Deliberately API-key-only - there is no per-capability model
+ * configuration here anymore. Which model gets used is chosen live,
+ * per real available model for that provider's own linked key, in the
+ * Coding view's own "AI Model" dropdown (see WorkspaceBar.jsx /
+ * CodingProviderRegistry.listModelsForProvider) - not pre-set here.
  * ==========================================
  */
 export default function AiProvidersPanel() {
@@ -42,8 +39,6 @@ export default function AiProvidersPanel() {
     const [keyDrafts, setKeyDrafts] = useState({});
     const [editingKeyFor, setEditingKeyFor] = useState(null);
     const [savingKeyFor, setSavingKeyFor] = useState(null);
-    const [modelDrafts, setModelDrafts] = useState({});
-    const [savingModelsFor, setSavingModelsFor] = useState(null);
 
     useEffect(() => {
         refresh();
@@ -55,11 +50,6 @@ export default function AiProvidersPanel() {
             setLoading(true);
             const list = await providerSettingsService.listProviders();
             setProviders(list);
-            const drafts = {};
-            for (const p of list) {
-                drafts[p.provider] = { ...p.models };
-            }
-            setModelDrafts(drafts);
         } catch (error) {
             console.error(error);
             message.error("Couldn't load AI provider settings.");
@@ -119,20 +109,6 @@ export default function AiProvidersPanel() {
         }
     }
 
-    async function handleSaveModels(provider) {
-        try {
-            setSavingModelsFor(provider);
-            const updated = await providerSettingsService.setModels(provider, modelDrafts[provider] || {});
-            updateOne(provider, updated);
-            message.success(`${PROVIDER_LABELS[provider]} models updated.`);
-        } catch (error) {
-            console.error(error);
-            message.error("Couldn't save those models.");
-        } finally {
-            setSavingModelsFor(null);
-        }
-    }
-
     if (loading) {
         return <Text type="secondary">Loading…</Text>;
     }
@@ -146,7 +122,8 @@ export default function AiProvidersPanel() {
             <Paragraph type="secondary" style={{ marginBottom: 16 }}>
                 Add your own API key for each provider you want to use. Keys are encrypted at rest and are
                 never sent back to this screen in plain text - once saved, only a masked version is shown.
-                One key per provider is reused across every model/capability below it.
+                Pick which model to use for each task from the Coding view's own AI Model dropdown, right
+                where you're using it - not here.
             </Paragraph>
 
             <Space direction="vertical" style={{ width: "100%" }} size={16}>
@@ -177,7 +154,7 @@ export default function AiProvidersPanel() {
                             )
                         }
                     >
-                        <div style={{ marginBottom: 16 }}>
+                        <div>
                             <Text className="ai-providers-label" style={{ display: "block", marginBottom: 6 }}>
                                 API Key
                             </Text>
@@ -220,37 +197,6 @@ export default function AiProvidersPanel() {
                                 </Space>
                             )}
                         </div>
-
-                        {p.hasKey && (p.capabilities || []).length > 0 && (
-                            <div>
-                                <Space direction="vertical" style={{ width: "100%" }} size={8}>
-                                    {p.capabilities.map((capability) => (
-                                        <div key={capability} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                            <Text style={{ width: 150, flexShrink: 0 }}>
-                                                {CAPABILITY_LABELS[capability] || capability}
-                                            </Text>
-                                            <Input
-                                                style={{ maxWidth: 260 }}
-                                                placeholder={p.models?.[capability] || "default"}
-                                                value={modelDrafts[p.provider]?.[capability] || ""}
-                                                onChange={(e) => setModelDrafts((prev) => ({
-                                                    ...prev,
-                                                    [p.provider]: { ...prev[p.provider], [capability]: e.target.value }
-                                                }))}
-                                            />
-                                        </div>
-                                    ))}
-                                </Space>
-                                <Button
-                                    style={{ marginTop: 12 }}
-                                    size="small"
-                                    loading={savingModelsFor === p.provider}
-                                    onClick={() => handleSaveModels(p.provider)}
-                                >
-                                    Save models
-                                </Button>
-                            </div>
-                        )}
                     </Card>
                 ))}
             </Space>

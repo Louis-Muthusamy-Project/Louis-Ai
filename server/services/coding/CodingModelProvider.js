@@ -11,6 +11,11 @@
  * A concrete provider must implement:
  *
  *   getName(): string
+ *   getModel(): string
+ *       The specific model id this instance was actually built with (see
+ *       CodingProviderRegistry.getCodingProvider's modelOverride) - used
+ *       only to report the real model in use back to the UI (the
+ *       coding:session:start event), never to make any runtime decision.
  *   isConfigured(): boolean
  *       Whether this provider's API key is present - the runtime and the
  *       UI both use this before allowing selection/execution.
@@ -40,6 +45,7 @@
  */
 class CodingModelProvider {
     getName() { throw new Error("getName() not implemented"); }
+    getModel() { throw new Error("getModel() not implemented"); }
     isConfigured() { throw new Error("isConfigured() not implemented"); }
     async sendTurn() { throw new Error("sendTurn() not implemented"); }
     appendModelTurn() { throw new Error("appendModelTurn() not implemented"); }

@@ -61,9 +61,14 @@ class CodingProviderRegistry {
     /**
      * @param {string} userId authenticated user id - never client-supplied
      * @param {"gemini"|"openai"|"claude"} name
+     * @param {string} [modelOverride] A specific model id to use instead of
+     *   this provider's stored "coding" capability default - e.g. the
+     *   model the user picked in the Coding top bar's AI Model dropdown
+     *   (populated from listModelsForProvider below). One provider key
+     *   still serves every model; this never touches credential storage.
      * @returns {Promise<import('./CodingModelProvider')>}
      */
-    async getCodingProvider(userId, name) {
+    async getCodingProvider(userId, name, modelOverride) {
         if (!userId) {
             throw new Error("CodingProviderRegistry.getCodingProvider requires an authenticated userId.");
         }
@@ -78,6 +83,9 @@ class CodingProviderRegistry {
         // Resolves THIS user's own decrypted credential and builds a fresh,
         // never-cached provider instance - see ProviderManager.resolveForUser.
         const rawProvider = await this.providerManager.resolveForUser(userId, name, "coding");
+        if (modelOverride) {
+            rawProvider.model = modelOverride;
+        }
 
         switch (name) {
             case "gemini":
@@ -92,6 +100,32 @@ class CodingProviderRegistry {
                 // without a matching case here.
                 throw new Error(`No coding provider adapter implemented for "${name}" yet.`);
         }
+    }
+
+    /**
+     * The real, live list of models THIS user's own key for `name` can
+     * actually use - see each raw provider's listModels() (Gemini: direct
+     * REST call to Google's public models endpoint; OpenAI/Claude: the
+     * SDKs' own models.list()). Never a hardcoded catalog - what comes
+     * back is exactly what that provider currently reports for that key.
+     *
+     * @param {string} userId authenticated user id - never client-supplied
+     * @param {"gemini"|"openai"|"claude"} name
+     * @returns {Promise<Array<{id: string, label: string}>>}
+     */
+    async listModelsForProvider(userId, name) {
+        if (!userId) {
+            throw new Error("CodingProviderRegistry.listModelsForProvider requires an authenticated userId.");
+        }
+        const status = this.getProviderStatus(userId).find((p) => p.name === name);
+        if (!status) {
+            throw new Error(`Unknown coding provider: ${name}`);
+        }
+        if (!status.enabled) {
+            throw new Error(`Coding provider "${status.label}" is not available: ${status.reason}`);
+        }
+        const rawProvider = await this.providerManager.resolveForListingModels(userId, name);
+        return rawProvider.listModels();
     }
 }
 

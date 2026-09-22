@@ -39,6 +39,23 @@ class OpenAIProvider extends BaseAIProvider {
         this.model = options.model || openaiConfig.model;
     }
 
+    /**
+     * Real, live list of this key's actually-available OpenAI models -
+     * via the SDK's own documented models.list() (verified against the
+     * SDK's shipped type definitions, not a live call - no network route
+     * to OpenAI's endpoints in this sandbox). Filtered to chat/reasoning-
+     * capable model families only (excludes embeddings/tts/whisper/
+     * dall-e/moderation entries the same endpoint also returns, which
+     * are not valid choices for the Coding Agent).
+     */
+    async listModels() {
+        const list = await this.client.models.list();
+        return (list.data || [])
+            .filter(m => /^(gpt-|o[0-9]|chatgpt-)/i.test(m.id))
+            .map(m => ({ id: m.id, label: m.id }))
+            .sort((a, b) => a.id.localeCompare(b.id));
+    }
+
     getName() {
         return "openai";
     }

@@ -226,6 +226,7 @@ function registerSocketHandlers(io) {
                 params: {
                     task: payload && payload.task,
                     provider: payload && payload.provider,
+                    model: payload && payload.model,
                     maxIterations: payload && payload.maxIterations,
                     maxToolCalls: payload && payload.maxToolCalls,
                     maxRuntimeMs: payload && payload.maxRuntimeMs
@@ -291,7 +292,7 @@ function registerSocketHandlers(io) {
             "file.read", "file.write", "file.create", "file.delete", "file.rename",
             "terminal.run", "terminal.cancel",
             "git.status", "git.diff", "git.log", "git.stage", "git.unstage", "git.commit", "git.branch",
-            "agent.providers", "agent.sessions.list", "agent.sessions.get"
+            "agent.providers", "agent.models", "agent.sessions.list", "agent.sessions.get"
         ]);
 
         socket.on("CODING_CAPABILITY_ACTION", async (payload, callback) => {
@@ -317,8 +318,15 @@ function registerSocketHandlers(io) {
                     // specific command while it's still running - the ack
                     // callback below only resolves once the command
                     // finishes, which is too late for Cancel to do anything.
+                    // clientRunToken is echoed back exactly as sent (opaque
+                    // to the server) so a client with several terminal tabs
+                    // running commands concurrently can tell which one of
+                    // ITS OWN in-flight calls this runId belongs to, rather
+                    // than guessing from a bare runId with no correlation
+                    // back to the specific terminal.run call that started it.
+                    const clientRunToken = params.clientRunToken;
                     params.onStart = (runId) => {
-                        socket.emit("CODING_TERMINAL_RUN_STARTED", { runId });
+                        socket.emit("CODING_TERMINAL_RUN_STARTED", { runId, clientRunToken });
                     };
                 }
                 const result = await codingCapability.execute({

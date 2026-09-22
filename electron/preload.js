@@ -30,7 +30,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
     "wake:popup:show",
     "wake:popup:ready",
     "wake:popup:hide",
-    "wake:microphone:permission"
+    "wake:microphone:permission",
+    "wake:mic:busy"
 ]);
 
 // Main -> renderer push channels (webContents.send) - kept in sync with
@@ -38,7 +39,8 @@ const ALLOWED_INVOKE_CHANNELS = new Set([
 const ALLOWED_LISTEN_CHANNELS = new Set([
     "wake:popup:init",
     "wake:status:update",
-    "wake:settings:changed"
+    "wake:settings:changed",
+    "wake:mic:busy:changed"
 ]);
 
 contextBridge.exposeInMainWorld(

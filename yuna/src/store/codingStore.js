@@ -59,7 +59,7 @@ const useCodingStore = create((set) => ({
 
     // ---- Editor tabs ---------------------------------------------------
 
-    openTabs: [], // [{path, content, originalContent, dirty, loading, error, externalConflict}]
+    openTabs: [], // [{path, content, originalContent, dirty, loading, error}]
     activeTabPath: null,
 
     openTabLoading(path) {
@@ -68,7 +68,7 @@ const useCodingStore = create((set) => ({
                 return { activeTabPath: path };
             }
             return {
-                openTabs: [...state.openTabs, { path, content: "", originalContent: "", hash: null, dirty: false, loading: true, error: null, externalConflict: false }],
+                openTabs: [...state.openTabs, { path, content: "", originalContent: "", hash: null, dirty: false, loading: true, error: null }],
                 activeTabPath: path
             };
         });
@@ -77,7 +77,7 @@ const useCodingStore = create((set) => ({
     setTabContent(path, content, hash = null) {
         set(state => ({
             openTabs: state.openTabs.map(t => t.path === path
-                ? { ...t, content, originalContent: content, hash, dirty: false, loading: false, error: null, externalConflict: false }
+                ? { ...t, content, originalContent: content, hash, dirty: false, loading: false, error: null }
                 : t)
         }));
     },
@@ -99,14 +99,8 @@ const useCodingStore = create((set) => ({
     markTabSaved(path, savedContent, hash = null) {
         set(state => ({
             openTabs: state.openTabs.map(t => t.path === path
-                ? { ...t, content: savedContent, originalContent: savedContent, hash: hash ?? t.hash, dirty: false, externalConflict: false }
+                ? { ...t, content: savedContent, originalContent: savedContent, hash: hash ?? t.hash, dirty: false }
                 : t)
-        }));
-    },
-
-    markTabConflict(path) {
-        set(state => ({
-            openTabs: state.openTabs.map(t => t.path === path ? { ...t, externalConflict: true } : t)
         }));
     },
 
@@ -122,17 +116,6 @@ const useCodingStore = create((set) => ({
 
     setActiveTab(path) {
         set({ activeTabPath: path });
-    },
-
-    // A file this agent (or another tab) just changed on disk - if it's
-    // open and NOT dirty, the content is stale; mark it so the editor can
-    // show a reload affordance instead of silently going stale.
-    markFileChangedExternally(path) {
-        set(state => ({
-            openTabs: state.openTabs.map(t => t.path === path && !t.dirty
-                ? { ...t, externalConflict: true }
-                : t)
-        }));
     },
 
     // Set by SearchPanel when a result is opened - CodeEditor watches this
@@ -156,6 +139,12 @@ const useCodingStore = create((set) => ({
     providers: [],
     providersLoading: false,
     selectedProvider: null,
+    // Real per-provider model lists (see CodingSocketService.listProviderModels /
+    // CodingProviderRegistry.listModelsForProvider) - fetched lazily, once
+    // per provider, the first time it becomes selected. Never a hardcoded
+    // catalog: exactly what that provider reports for the user's own key.
+    modelsByProvider: {}, // {[providerName]: {loading, models: [{id,label}], error}}
+    selectedModel: null,
 
     setProviders(providers) {
         set(state => ({
@@ -174,18 +163,40 @@ const useCodingStore = create((set) => ({
     },
 
     setSelectedProvider(name) {
-        set({ selectedProvider: name });
+        set({ selectedProvider: name, selectedModel: null });
+    },
+
+    setModelsLoading(provider) {
+        set(state => ({
+            modelsByProvider: { ...state.modelsByProvider, [provider]: { loading: true, models: [], error: null } }
+        }));
+    },
+
+    setModelsForProvider(provider, models) {
+        set(state => ({
+            modelsByProvider: { ...state.modelsByProvider, [provider]: { loading: false, models, error: null } }
+        }));
+    },
+
+    setModelsError(provider, error) {
+        set(state => ({
+            modelsByProvider: { ...state.modelsByProvider, [provider]: { loading: false, models: [], error } }
+        }));
+    },
+
+    setSelectedModel(id) {
+        set({ selectedModel: id });
     },
 
     // ---- Live agent session ----------------------------------------------
 
-    session: null, // {sessionId, state, task, provider, iterations, toolCalls, changedFiles, startedAt}
+    session: null, // {sessionId, state, task, provider, model, iterations, toolCalls, changedFiles, startedAt}
     activity: [],
     pendingApproval: null,
 
-    startSession({ sessionId, task, provider }) {
+    startSession({ sessionId, task, provider, model }) {
         set({
-            session: { sessionId, state: "RUNNING", task, provider, iterations: 0, toolCalls: 0, changedFiles: [], startedAt: Date.now() },
+            session: { sessionId, state: "RUNNING", task, provider, model, iterations: 0, toolCalls: 0, changedFiles: [], startedAt: Date.now() },
             activity: [],
             pendingApproval: null
         });
@@ -231,11 +242,48 @@ const useCodingStore = create((set) => ({
 
     // ---- Terminal ----------------------------------------------------------
 
-    terminalHistory: [], // [{id, command, stdout, stderr, exitCode, running, startedAt}]
+    // Multiple independent terminal instances (like VS Code/Antigravity's
+    // terminal list) - "agent" is the default, non-closable tab the real
+    // CodingAgentRuntime's own tool-call terminal activity always lands in
+    // (see CodingProvider.jsx's onTerminalStart, which never passes a
+    // terminalId and so always targets this one) - additional tabs are
+    // purely for the user's own manual commands, created/closed from the
+    // Terminal panel itself.
+    terminals: [{ id: "agent", label: "Agent", closable: false }],
+    activeTerminalId: "agent",
 
-    startTerminalEntry(id, command) {
+    addTerminal() {
         set(state => {
-            const entry = { id, command, stdout: "", stderr: "", exitCode: null, running: true, startedAt: Date.now() };
+            const n = state.terminals.filter(t => t.id !== "agent").length + 1;
+            const id = `terminal-${Date.now()}`;
+            return {
+                terminals: [...state.terminals, { id, label: `Terminal ${n}`, closable: true }],
+                activeTerminalId: id
+            };
+        });
+    },
+
+    closeTerminal(id) {
+        set(state => {
+            if (id === "agent") return state; // the agent's own tab is never closable
+            const terminals = state.terminals.filter(t => t.id !== id);
+            const terminalHistory = state.terminalHistory.filter(e => e.terminalId !== id);
+            const activeTerminalId = state.activeTerminalId === id
+                ? terminals[terminals.length - 1].id
+                : state.activeTerminalId;
+            return { terminals, terminalHistory, activeTerminalId };
+        });
+    },
+
+    setActiveTerminal(id) {
+        set({ activeTerminalId: id });
+    },
+
+    terminalHistory: [], // [{id, terminalId, command, stdout, stderr, exitCode, running, startedAt}]
+
+    startTerminalEntry(id, command, terminalId = "agent") {
+        set(state => {
+            const entry = { id, terminalId, command, stdout: "", stderr: "", exitCode: null, running: true, startedAt: Date.now() };
             const history = [...state.terminalHistory, entry];
             return { terminalHistory: history.length > MAX_TERMINAL_ENTRIES ? history.slice(history.length - MAX_TERMINAL_ENTRIES) : history };
         });
@@ -289,6 +337,7 @@ const useCodingStore = create((set) => ({
             openTabs: [], activeTabPath: null, pendingReveal: null,
             session: null, activity: [], pendingApproval: null,
             terminalHistory: [],
+            terminals: [{ id: "agent", label: "Agent", closable: false }], activeTerminalId: "agent",
             gitStatus: null, gitDiff: null, gitLog: null
         });
     }

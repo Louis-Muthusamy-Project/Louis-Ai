@@ -21,6 +21,10 @@ class ClaudeCodingProvider extends CodingModelProvider {
         return "claude";
     }
 
+    getModel() {
+        return this.anthropicProvider.model;
+    }
+
     isConfigured() {
         return !!(this.anthropicProvider);
     }

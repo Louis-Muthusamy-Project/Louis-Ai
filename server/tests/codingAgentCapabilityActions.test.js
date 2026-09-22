@@ -75,6 +75,7 @@ test("CodingWorkspaceCapability: agent.run rejects an unavailable provider (clau
 class ScriptedProvider extends CodingModelProvider {
     constructor(script) { super(); this.script = script; this.i = 0; }
     getName() { return "gemini"; }
+    getModel() { return "gemini-test-model"; }
     isConfigured() { return true; }
     buildInitialHistory(task) { return [{ task }]; }
     async sendTurn() {

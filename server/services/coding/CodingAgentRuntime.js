@@ -69,11 +69,19 @@ text summarizing exactly what you changed, what you ran, and the result -
 do not call any more tools once you're giving your final answer.`;
 
 class CodingAgentSession {
-    constructor(sessionId, userId, providerName, task) {
+    constructor(sessionId, userId, providerName, task, model) {
         this.sessionId = sessionId;
         this.userId = userId;
         this.providerName = providerName;
         this.task = task;
+        // The exact model this session actually started with (see
+        // provider.getModel() in run()) - immutable for the life of this
+        // session. A later change to the user's selected model in the UI
+        // must only affect a NEW run, never silently retarget an
+        // already-running/persisted session on resume - see
+        // _rebuildProvider(), which always uses THIS field, never
+        // whatever is currently selected in the frontend.
+        this.model = model || null;
         this.state = STATES.IDLE;
         this.cancelled = false;
         this.iterations = 0;
@@ -175,7 +183,7 @@ class CodingAgentRuntime {
         }
 
         const sessionId = crypto.randomUUID();
-        const session = new CodingAgentSession(sessionId, userId, provider.getName(), taskText);
+        const session = new CodingAgentSession(sessionId, userId, provider.getName(), taskText, provider.getModel());
         session.state = STATES.RUNNING;
         session.maxIterations = options.maxIterations || DEFAULT_MAX_ITERATIONS;
         session.maxToolCalls = options.maxToolCalls || DEFAULT_MAX_TOOL_CALLS;
@@ -184,7 +192,7 @@ class CodingAgentRuntime {
         session.history = provider.buildInitialHistory(taskText, SYSTEM_INSTRUCTION);
         this._sessions.set(sessionId, session);
 
-        this._emit(session, "coding:session:start", { task: taskText, provider: provider.getName() });
+        this._emit(session, "coding:session:start", { task: taskText, provider: provider.getName(), model: provider.getModel() });
         await this._persist(session);
 
         return this._loop(session, provider);
@@ -238,7 +246,7 @@ class CodingAgentRuntime {
             return this._finish(session, STATES.CANCELLED, "Pending action denied by user.");
         }
 
-        const provider = session.provider || await this._rebuildProvider(userId, session.providerName);
+        const provider = session.provider || await this._rebuildProvider(userId, session.providerName, session.model);
         session.provider = provider;
         session.state = STATES.RUNNING;
 
@@ -261,11 +269,20 @@ class CodingAgentRuntime {
         return this._loop(session, provider);
     }
 
-    async _rebuildProvider(userId, providerName) {
+    /**
+     * @param {string} userId
+     * @param {string} providerName
+     * @param {string} [model] The persisted session's own model (see
+     *   CodingAgentSession.model) - the ONLY source of truth for resume.
+     *   Never read from current frontend/UI state: the user may have since
+     *   changed the model dropdown, which must affect a NEW run only,
+     *   never silently retarget this already-in-progress session.
+     */
+    async _rebuildProvider(userId, providerName, model) {
         if (!this.providerRegistry) {
             throw new Error("Cannot resume this session: no provider registry is configured on this runtime instance (likely a fresh process with no prior in-memory session).");
         }
-        return this.providerRegistry.getCodingProvider(userId, providerName);
+        return this.providerRegistry.getCodingProvider(userId, providerName, model);
     }
 
     async _reconstructSession(userId, sessionId) {
@@ -273,7 +290,7 @@ class CodingAgentRuntime {
         const record = await this.sessionService.getOwned(userId, sessionId);
         if (!record) return null;
 
-        const session = new CodingAgentSession(record.sessionId, record.userId, record.providerName, record.task);
+        const session = new CodingAgentSession(record.sessionId, record.userId, record.providerName, record.task, record.model);
         session.state = record.state;
         session.history = record.history;
         session.finalText = record.finalText || "";
@@ -435,6 +452,7 @@ class CodingAgentRuntime {
         return {
             sessionId: session.sessionId,
             state: session.state,
+            model: session.model,
             text: session.finalText,
             message: session.message,
             changedFiles: [...session.changedFiles],

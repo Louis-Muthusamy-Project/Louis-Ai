@@ -31,8 +31,18 @@ class CodingSocketService {
         return SocketService.emitWithAck(CODING_CAPABILITY_ACTION, { action: "agent.providers", params: {} });
     }
 
-    runAgent({ task, provider, maxIterations, maxToolCalls, maxRuntimeMs }) {
-        SocketService.emit(CODING_AGENT_RUN, { task, provider, maxIterations, maxToolCalls, maxRuntimeMs });
+    /**
+     * The real, live models THIS user's own key for `provider` can
+     * actually use (see CodingProviderRegistry.listModelsForProvider) -
+     * never a hardcoded catalog, and never shown/selectable for a
+     * provider that isn't actually configured/enabled.
+     */
+    listProviderModels(provider) {
+        return SocketService.emitWithAck(CODING_CAPABILITY_ACTION, { action: "agent.models", params: { provider } });
+    }
+
+    runAgent({ task, provider, model, maxIterations, maxToolCalls, maxRuntimeMs }) {
+        SocketService.emit(CODING_AGENT_RUN, { task, provider, model, maxIterations, maxToolCalls, maxRuntimeMs });
     }
 
     cancelAgent(sessionId) {
@@ -85,8 +95,8 @@ class CodingSocketService {
 
     // ---- Terminal ---------------------------------------------------------
 
-    runCommand(command, { cwd, timeoutMs, confirmed = false } = {}) {
-        return this._call("terminal.run", { command, cwd, timeoutMs, confirmed });
+    runCommand(command, { cwd, timeoutMs, confirmed = false, clientRunToken } = {}) {
+        return this._call("terminal.run", { command, cwd, timeoutMs, confirmed, clientRunToken });
     }
 
     cancelCommand(runId) {

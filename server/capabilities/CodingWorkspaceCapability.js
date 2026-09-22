@@ -119,8 +119,11 @@ class CodingWorkspaceCapability extends BaseCapability {
                 case "agent.providers":
                     return { success: true, providers: this.providerRegistry.getProviderStatus(__ownerId) };
 
+                case "agent.models":
+                    return { success: true, models: await this.providerRegistry.listModelsForProvider(__ownerId, params.provider) };
+
                 case "agent.run": {
-                    const provider = await this.providerRegistry.getCodingProvider(__ownerId, params.provider);
+                    const provider = await this.providerRegistry.getCodingProvider(__ownerId, params.provider, params.model);
                     const result = await this._runtime.run(__ownerId, params.task, provider, {
                         maxIterations: params.maxIterations,
                         maxToolCalls: params.maxToolCalls,

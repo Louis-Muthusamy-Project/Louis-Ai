@@ -38,6 +38,13 @@ export default function WakeListener() {
     const enabledRef = useRef(true);
     const restartTimerRef = useRef(null);
     const stoppedRef = useRef(false);
+    // True while the MAIN window's own manual mic (Chat/Character voice
+    // input, the Coding Agent panel's mic) is actively capturing - see
+    // ElectronService.setWakeMicBusy/onWakeMicBusyChanged. Distinct from
+    // stoppedRef (permission denied / wake toggled off): this is always
+    // temporary and auto-resumes on its own once the manual mic stops,
+    // with no user action needed.
+    const pausedForMicRef = useRef(false);
     const [debugStatus, setDebugStatus] = useState("initializing");
 
     useEffect(() => {
@@ -80,15 +87,15 @@ export default function WakeListener() {
         }
 
         function scheduleRestart() {
-            if (stoppedRef.current || cancelled) return;
+            if (stoppedRef.current || cancelled || pausedForMicRef.current) return;
             clearTimeout(restartTimerRef.current);
             restartTimerRef.current = setTimeout(() => {
-                if (!stoppedRef.current && enabledRef.current) startRecognition();
+                if (!stoppedRef.current && enabledRef.current && !pausedForMicRef.current) startRecognition();
             }, RESTART_DELAY_MS);
         }
 
         function startRecognition() {
-            if (cancelled || stoppedRef.current || !enabledRef.current) return;
+            if (cancelled || stoppedRef.current || !enabledRef.current || pausedForMicRef.current) return;
 
             const SpeechRecognitionCtor = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognitionCtor) {
@@ -187,6 +194,26 @@ export default function WakeListener() {
                 startRecognition();
             } else {
                 stopRecognition();
+            }
+        });
+
+        // Pause/resume around the MAIN window's own manual mic use - see
+        // pausedForMicRef's own comment above for why this exists (two
+        // simultaneous SpeechRecognition sessions fighting over the same
+        // microphone was making the manual mic toggle self-cancel
+        // immediately).
+        ElectronService.onWakeMicBusyChanged(({ busy } = {}) => {
+            if (busy) {
+                pausedForMicRef.current = true;
+                clearTimeout(restartTimerRef.current);
+                recognitionRef.current?.stop();
+                recognitionRef.current = null;
+                report({ engineStatus: "paused", permission: "granted", microphoneAvailable: true, error: null });
+            } else {
+                pausedForMicRef.current = false;
+                if (enabledRef.current && !stoppedRef.current) {
+                    startRecognition();
+                }
             }
         });
 

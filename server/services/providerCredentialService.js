@@ -258,6 +258,31 @@ class ProviderCredentialService {
             imageModel: models.image
         };
     }
+
+    /**
+     * Decrypts and returns just { apiKey } for one provider - no
+     * capability/model lookup at all, unlike resolveCredential above.
+     * Used ONLY for listing a provider's real available models (see
+     * ProviderManager.resolveForListingModels), where by definition no
+     * model has been chosen yet. Same server-internal-only rule as
+     * resolveCredential: never expose this return value through a route
+     * or socket event.
+     */
+    async resolveApiKeyOnly(userId, provider) {
+        this._requireUserId(userId);
+        this._requireProvider(provider);
+
+        const all = this._readAll(userId);
+        const record = all[provider];
+
+        if (!record || !record.apiKeyEncrypted || !record.enabled) {
+            throw new Error(
+                `${provider} is not configured. Add an API key for ${provider} in Settings before using it.`
+            );
+        }
+
+        return { apiKey: decrypt(record.apiKeyEncrypted) };
+    }
 }
 
 const wrapper = {

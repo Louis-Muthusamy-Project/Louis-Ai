@@ -34,6 +34,37 @@ class GeminiProvider extends BaseAIProvider {
 
         this.model = options.model || geminiConfig.model;
         this.imageModel = options.imageModel || geminiConfig.imageModel;
+        // Retained ONLY for listModels()'s direct REST call below - the
+        // @google/genai SDK (installed version) has no public models.list()
+        // method (only an internal/private one this codebase will not call,
+        // since that's unstable, unsupported API surface), so listing uses
+        // Google's own documented public REST endpoint instead. Never
+        // logged, never returned to the frontend.
+        this._apiKey = apiKey;
+    }
+
+    /**
+     * Real, live list of this key's actually-available Gemini models -
+     * never a hardcoded/guessed catalog. Uses Google's public REST
+     * endpoint directly (see this._apiKey's comment for why: no SDK
+     * wrapper for it in the installed @google/genai version).
+     */
+    async listModels() {
+        const response = await fetch(
+            `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(this._apiKey)}`
+        );
+        if (!response.ok) {
+            const body = await response.text().catch(() => "");
+            throw new Error(`Could not list Gemini models (${response.status}): ${body.slice(0, 200)}`);
+        }
+        const data = await response.json();
+        return (data.models || [])
+            .filter(m => Array.isArray(m.supportedGenerationMethods) && m.supportedGenerationMethods.includes("generateContent"))
+            .map(m => ({
+                id: (m.name || "").replace(/^models\//, ""),
+                label: m.displayName || (m.name || "").replace(/^models\//, "")
+            }))
+            .filter(m => m.id);
     }
 
     getName() {

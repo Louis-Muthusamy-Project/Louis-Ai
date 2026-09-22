@@ -41,6 +41,7 @@ class FakeCodingModelProvider extends CodingModelProvider {
         this.resultBatches = [];
     }
     getName() { return "fake"; }
+    getModel() { return "fake-model-1"; }
     isConfigured() { return this.configured; }
     buildInitialHistory(taskText) { return [{ turn: "initial", taskText }]; }
     async sendTurn(history) {
@@ -155,6 +156,19 @@ test("CodingAgentRuntime: stops safely at maxToolCalls even within a single turn
 
     assert.equal(result.state, STATES.LIMIT_REACHED);
     assert.equal(result.toolCalls, 3);
+});
+
+test("CodingAgentRuntime.run: coding:session:start reports the actual resolved model (provider.getModel()), not a guess", async () => {
+    makeWorkspace();
+    const provider = new FakeCodingModelProvider([{ text: "done" }]);
+    const bus = new EventEmitter();
+    let capturedModel = null;
+    bus.on("coding:session:start", (e) => { capturedModel = e.model; });
+    CodingAgentRuntime.initialize(bus);
+
+    await CodingAgentRuntime.run("agentuser", "just answer", provider);
+
+    assert.equal(capturedModel, "fake-model-1");
 });
 
 test("CodingAgentRuntime: cancel() actually stops the loop and kills a real running terminal process", async () => {

@@ -154,6 +154,27 @@ class SocketService {
             this.listeners[event].push(callback);
         }
 
+        // The real bug this closes: several independent call sites
+        // (authStore.restoreSession()/login()/signup(), ChatProvider,
+        // useSocket, CodingProvider) each call connect() on their own
+        // schedule, and a socket.io socket only ever fires its native
+        // "connect" event ONCE per connection - never again while it
+        // stays connected. If the connection already succeeded (e.g.
+        // authStore connected it during restoreSession(), a tick or two
+        // before ChatProvider's own effect even mounts and calls
+        // SocketService.on("connect", onConnect)), a listener that
+        // subscribes AFTER that moment would otherwise wait forever for
+        // an event that has already happened - the UI would show
+        // "Disconnected" indefinitely for a socket that is actually live
+        // (fixed by reloading only because a fresh page reload restarts
+        // the whole race from a clean slate, which happens to land the
+        // right way round often enough to look "fixed"). So: tell a
+        // late-subscribing "connect" listener the true current state
+        // immediately, synchronously, right here.
+        if (event === "connect" && this.socket?.connected) {
+            callback();
+        }
+
     }
 
     off(event, callback) {

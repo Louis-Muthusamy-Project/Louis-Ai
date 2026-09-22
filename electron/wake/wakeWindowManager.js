@@ -218,6 +218,23 @@ class WakeWindowManager {
         return !!this._listenerWindow && !this._listenerWindow.isDestroyed() && this._listenerWindow.webContents === webContents;
     }
 
+    /**
+     * Sends an IPC message directly to the hidden listener window only -
+     * used by wake:mic:busy (see ipc/wake.js) to pause/resume its
+     * continuous SpeechRecognition session while the main window's own
+     * manual mic (Chat/Character voice input, or the Coding Agent
+     * panel's mic) is actively capturing. Chromium/Electron only
+     * reliably supports one active SpeechRecognition session at a time
+     * across the app's renderers sharing the same microphone - running
+     * both simultaneously is what was causing the manual mic toggle to
+     * immediately self-cancel.
+     */
+    sendToListener(channel, payload) {
+        if (this._listenerWindow && !this._listenerWindow.isDestroyed()) {
+            this._listenerWindow.webContents.send(channel, payload);
+        }
+    }
+
     destroyAll() {
         if (this._listenerWindow && !this._listenerWindow.isDestroyed()) this._listenerWindow.destroy();
         if (this._popupWindow && !this._popupWindow.isDestroyed()) this._popupWindow.destroy();
